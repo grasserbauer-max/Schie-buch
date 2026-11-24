@@ -1,5 +1,10 @@
-# Mein Schießbuch – iPhone-PWA v1.1.0
+# Mein Schießbuch – iPhone-PWA v1.2.0
 
-- Serienentwicklungsdiagramm verwendet eine Y-Achsen-Skalierung in 0,5-Punkte-Schritten.
-- Kleinster Teiler wird aus den gespeicherten Werten des PDF-Feldes „beste Teiler“ ermittelt und sowohl im Dashboard als auch in der Ergebnisliste korrekt angezeigt.
-- Kennzeichnung „Gesamte Zehner“ erklärt, dass alle 10er einschließlich Innenzehner gemeint sind.
+- Einstellungsmenü: Name, Akzentfarbe, Aktivierung von LG 40 ZR-Wettkämpfen.
+- Titel zeigt „[Name]s Schießbuch“; bisherige LG-60-/Training-Unterzeile entfernt.
+- LG-40-ZR-PDFs werden standardmäßig blockiert, bis die Disziplin in den Einstellungen aktiviert ist.
+- Serienanzahl wird aus der PDF ermittelt; der Parser verarbeitet alle erkannten Serien und erwartet je Serie zehn Schüsse.
+- Bereits gespeicherte Ergebnisse bleiben in IndexedDB erhalten.
+
+Wichtiger Hinweis zu den Schusspfeilen:
+Die Meyton-PDF enthält die kleinen Pfeile als grafische Vektorelemente. Die aktuelle PDF-Textauswertung kann diese nicht zuverlässig auslesen. Die Detailansicht zeigt Pfeile nur, wenn ein Ergebnis entsprechende shotDirections-Daten enthält. Eine automatische Extraktion dieser Grafikpfeile ist noch nicht implementiert; es werden keine Richtungen erfunden.
