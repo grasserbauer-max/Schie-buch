@@ -1,6 +1,8 @@
-# Schießbuch – iPhone-PWA v1.2.4
+# Schießbuch – iPhone-PWA v1.2.5
 
-- Die Detailansicht zeigt beim Gesamtergebnis weiterhin den vollen Ringwert in Klammern, z. B. 606,4 (582).
-- Jede 10-Schuss-Serie zeigt jetzt ebenfalls ihren Ringwert in Klammern, z. B. Serie 1: 99,8 (96).
-- Die Serienwerte und die zugehörigen Ringwerte werden direkt aus den Zeilen „Serie n: Wert (Ringzahl)“ der Meyton-PDF ausgelesen.
-- Service-Worker-Cache auf Version 1.2.4 erhöht.
+Serienentwicklung:
+- Vor dem Serien-Diagramm befindet sich ein Dropdown zur Auswahl eines einzelnen Wettkampfs/Trainingseintrags.
+- Standardmäßig ist der neueste Eintrag ausgewählt.
+- Das Diagramm zeigt nur die Serien 1 bis 6 des ausgewählten Eintrags, also maximal sechs Punkte.
+- Beim Wechsel der Auswahl wird das Diagramm aktualisiert.
+- Das separate Wettkampf-/Trainingsentwicklungsdiagramm bleibt unverändert.
