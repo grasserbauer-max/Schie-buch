@@ -1,13 +1,8 @@
-# Mein Schießbuch – iPhone-PWA v1.0.6
+# Mein Schießbuch – iPhone-PWA v1.0.7
 
-Die Detailansicht jedes importierten Ergebnisses zeigt alle Werte aus der Meyton-Auswertung:
-- Ergebnis inkl. Klammerwert
-- alle Serien
-- Zähler/Ringverteilung
-- Innenzehner
-- Weiteste
-- alle besten Teiler
-- Trefferkreis
-- Trefferlage
-
-Die Übersichtsseite behält die getrennten Kennzahlen für Innenzehner und gesamte Zehner. Ringverteilung und die übrigen Detaildaten werden nur beim Öffnen eines einzelnen Ergebnisses angezeigt.
+Fehlerkorrekturen und Erweiterungen:
+- Trefferlage der Gesamtwertung wird vor „Serie 1“ ausgelesen; die Trefferlagen der Einzelserien werden nicht versehentlich als Gesamt-Trefferlage zusammengefasst.
+- Jede der sechs Serien ist in der Detailansicht antippbar.
+- Nach Antippen einer Serie werden die zehn Einzelschüsse mit Schussnummer angezeigt; Sternchen für Innenzehner bleiben erhalten.
+- Beim PDF-Import zeigt die Vorschau die Anzahl erkannter Einzelschüsse pro Serie. Erwartet werden 10 je Serie.
+- Alle bisherigen Detaildaten bleiben enthalten.
