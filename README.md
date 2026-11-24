@@ -1,6 +1,5 @@
-# Mein Schießbuch – iPhone-PWA v1.0.9
+# Mein Schießbuch – iPhone-PWA v1.1.0
 
-Trefferlage-Erkennung korrigiert:
-- Der Parser sucht direkt nach dem ersten „Trefferlage:“ im PDF-Text.
-- Er extrahiert nur die beiden Werte mit Richtung, z. B. „0.49 mm links, 0.24 mm tief“.
-- Die Suche endet nach den Richtungsangaben, sodass nachfolgende Schussnummern nicht angehängt werden.
+- Serienentwicklungsdiagramm verwendet eine Y-Achsen-Skalierung in 0,5-Punkte-Schritten.
+- Kleinster Teiler wird aus den gespeicherten Werten des PDF-Feldes „beste Teiler“ ermittelt und sowohl im Dashboard als auch in der Ergebnisliste korrekt angezeigt.
+- Kennzeichnung „Gesamte Zehner“ erklärt, dass alle 10er einschließlich Innenzehner gemeint sind.
