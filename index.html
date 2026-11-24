@@ -4,7 +4,7 @@
 </style></head><body><main><div class="eyebrow">PERSÖNLICHES SCHIESSBUCH</div><h1>Meine Ergebnisse ◎</h1><div class="sub">LG 60 ZR · Wettkampf und Training getrennt</div>
 <div class="actions"><label class="btn primary">＋ PDF importieren<input id="pdf" type="file" accept=".pdf,application/pdf" multiple></label><button class="btn" id="manual">＋ Manuell</button><button class="btn" id="backup">Backup</button><label class="btn">Backup laden<input id="restore" type="file" accept=".json"></label></div>
 <div class="tabs"><button class="active" data-tab="competition">Wettkämpfe</button><button data-tab="training">Training</button></div><div id="dash"></div><div class="panel"><h2>Alle Einheiten</h2><div class="sub">Eintrag antippen für Details</div><div id="list"></div></div>
-<footer>Speicherung lokal im Browser. Für eine iCloud-Kopie „Backup“ wählen und die JSON-Datei in iCloud Drive speichern. Keine automatische iCloud-Synchronisierung. PDF-Textauswertung benötigt beim Import eine Internetverbindung.<div style="text-align:center;margin-top:14px;font-weight:700;letter-spacing:1px">Version 1.0.8</div></footer></main>
+<footer>Speicherung lokal im Browser. Für eine iCloud-Kopie „Backup“ wählen und die JSON-Datei in iCloud Drive speichern. Keine automatische iCloud-Synchronisierung. PDF-Textauswertung benötigt beim Import eine Internetverbindung.<div style="text-align:center;margin-top:14px;font-weight:700;letter-spacing:1px">Version 1.0.9</div></footer></main>
 <div class="modal" id="modal"><div class="sheet"><button class="btn" id="close">Schließen</button><div id="body"></div></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script>
 if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -50,9 +50,8 @@ let tens=Number(field('Innenzehner','Weiteste|beste Teiler|Trefferkreis|Trefferl
 let farthest=nums(field('Weiteste','beste Teiler|Trefferkreis|Trefferlage')).map(v=>v.trim());
 let dividers=nums(field('beste Teiler','Trefferkreis|Trefferlage')).map(v=>v.trim());
 let groupMatch=field('Trefferkreis','Trefferlage').match(/[\d]+[.,]?[\d]*/);
-let summaryText=t.split(/Serie\\s*1\\s*:/i)[0];
-let posMatch=summaryText.match(/Trefferlage\\s*:\\s*([0-9]+[.,][0-9]+\\s*mm\\s*(?:links|rechts))\\s*,\\s*([0-9]+[.,][0-9]+\\s*mm\\s*(?:tief|hoch))/i);
-let position=posMatch?(posMatch[1].replace(/\\s+/g,' ').trim()+', '+posMatch[2].replace(/\\s+/g,' ').trim()):'';
+let posMatch=t.match(/Trefferlage\s*:\s*([0-9]+[.,][0-9]+\s*mm\s*(?:links|rechts))\s*,\s*([0-9]+[.,][0-9]+\s*mm\s*(?:tief|hoch))/i);
+let position=posMatch?(posMatch[1].replace(/\s+/g,' ').trim()+', '+posMatch[2].replace(/\s+/g,' ').trim()):'';
 let shots=[];
 for(let n=1;n<=6;n++){
   let re=new RegExp('Serie\\s*'+n+'\\s*:\\s*[\\d]+[.,][\\d]+\\s*\\(\\s*\\d+\\s*\\)([\\s\\S]*?)(?=\\s+beste\\s+Teiler\\s*:|$)','i');
