@@ -1,11 +1,13 @@
-# Mein Schießbuch – iPhone-PWA v1.0.3
+# Mein Schießbuch – iPhone-PWA v1.0.6
 
-Änderungen:
-- Trefferlage und Trefferkreis aus der Anzeige und manuellen Erfassung entfernt.
-- Ringverteilung aus dem Meyton-Feld „Zähler“: 10er bis 0er.
-- Innenzehner separat.
-- Kleinster Teiler aus dem ersten Wert der Meyton-Zeile „beste Teiler“.
-- Serien, Wettkampf-/Trainings-Trennung, Diagramme, Backup bleiben enthalten.
-- Keine Beispieldaten oder hochgeladenen Nutzer-PDFs sind im Paket enthalten.
+Die Detailansicht jedes importierten Ergebnisses zeigt alle Werte aus der Meyton-Auswertung:
+- Ergebnis inkl. Klammerwert
+- alle Serien
+- Zähler/Ringverteilung
+- Innenzehner
+- Weiteste
+- alle besten Teiler
+- Trefferkreis
+- Trefferlage
 
-Bei manueller Eingabe können die elf Zählerwerte in der Reihenfolge 10er, 9er, ... 0er eingegeben werden.
+Die Übersichtsseite behält die getrennten Kennzahlen für Innenzehner und gesamte Zehner. Ringverteilung und die übrigen Detaildaten werden nur beim Öffnen eines einzelnen Ergebnisses angezeigt.
