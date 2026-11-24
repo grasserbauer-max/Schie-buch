@@ -1,17 +1,20 @@
-# Mein Schießbuch – iPhone-PWA
+# Mein Schießbuch – iPhone-PWA v1.0.2
 
-Die Web-App bietet getrennte Ansichten für Wettkämpfe und Training, Ergebnis- und Serien-Diagramme, Innenzehner, Trefferkreis, Trefferlage, Rekorde, PDF-Import, manuelle Eingabe und JSON-Backup.
+- Wettkampf und Training getrennt
+- Ergebnis- und Serien-Diagramme
+- PDF-Import mit Vorschau und Kategorienkontrolle
+- manuelle Eingabe, Details, Rekorde, Trefferkreis und Trefferlage
+- Backup als JSON
+- Aktualisieren-Schaltfläche und Versionsanzeige im Footer
 
-## Daten und iCloud
-Ergebnisse werden lokal im Safari-Browser (IndexedDB) gespeichert. Es gibt keine automatische iCloud-Synchronisierung. Über „Backup“ kann eine JSON-Datei erzeugt und in der iPhone-Dateien-App unter iCloud Drive gespeichert werden; diese Datei kann später wieder importiert werden.
+## Keine vorinstallierten Ergebnisse
+Die App startet mit einem leeren Archiv. Es werden keine der vom Nutzer gesendeten PDFs oder Ergebnisse automatisch hochgeladen oder vorausgefüllt. Bitte importiere deine eigenen Ergebnis-PDFs selbst.
 
-## Auf iPhone installieren – ohne Mac
-Die App benötigt eine HTTPS-Adresse, damit „Zum Home-Bildschirm“ und der Service Worker funktionieren. Du kannst den Ordnerinhalt z. B. über GitHub Pages veröffentlichen:
-1. Auf github.com ein Repository erstellen.
-2. Diese Dateien hochladen.
-3. Repository Settings → Pages → Deploy from branch → main → /(root).
-4. Die HTTPS-Adresse in Safari öffnen → Teilen → Zum Home-Bildschirm.
+## PDF-Import
+Die App ist auf textbasierte Meyton-PDFs ausgelegt. Bei der Trefferlage wird nur der Wert aus dem Kopfbereich vor „Serie 1“ gelesen, nicht der restliche Seiteninhalt. PDFs mit abweichendem Format bitte vor dem Speichern in der Importvorschau kontrollieren.
 
-PDF.js wird beim PDF-Import von einem CDN geladen; dafür ist eine Internetverbindung erforderlich. Der Import ist auf textbasierte Meyton-PDFs ausgelegt. Die Beispiel-Probe-PDF mit `inv`-Ergebnis hat kein normales Ring-Gesamtergebnis und kann daher nicht automatisch als Ring-Ergebnis importiert werden; bitte dafür manuell erfassen oder ein anderes Trainingsergebnis-PDF verwenden.
+## Hosting
+GitHub Pages: Repository-Dateien ins Hauptverzeichnis hochladen, Settings → Pages → Deploy from a branch → main → /(root). Anschließend HTTPS-Adresse in Safari öffnen und „Zum Home-Bildschirm“ wählen.
 
-Die beiden verifizierten Wettkampfergebnisse 599,9 und 606,4 sind als Startdaten eingebaut. Die Probe-PDF wurde nicht als gültiges Ergebnis übernommen.
+## Speicherung
+Lokal im Browser (IndexedDB). Für eine iCloud-Kopie „Backup“ wählen und JSON in iCloud Drive speichern. Keine automatische iCloud-Synchronisierung.
