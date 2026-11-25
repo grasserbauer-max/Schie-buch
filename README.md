@@ -1,21 +1,19 @@
-# Schießbuch – Version 1.3.0
+# Mein Schießbuch – Version 1.3.1
 
-Neue Funktion: Dokumentenscanner im PDF-Import-Bereich.
+## Änderungen
+- PDF-Import erkennt weiterhin echte PDF-Texte direkt über PDF.js.
+- Bei PDFs ohne auslesbare Textebene wird automatisch OCR (Tesseract.js, Deutsch/Englisch) auf den gerenderten PDF-Seiten ausgeführt.
+- Importvorschau zeigt zusätzlich erkannte Schützen-/Start-/Standdaten, Serien, Einzelschüsse, Zähler und weitere Meyton-Felder.
+- Dokument-Duplikatprüfung: SHA-256-Dateiprüfsumme sowie Vergleich von Kategorie, Disziplin, Datum, Ergebnis und Serien. Bei möglichem Duplikat erscheint eine Bestätigung.
+- Datenbankname bleibt unverändert `shootbook-v1`.
+- Service-Worker-Cache auf `schiessbuch-v1.3.1` aktualisiert.
 
-- Zusätzlicher Button „Dokument scannen“ neben „PDF importieren“.
-- iPhone-Kamera wird über den nativen Datei-/Kamera-Dialog aufgerufen.
-- Unterstützt eine oder zwei aufgenommene Seiten.
-- Seitenvorschau und Entfernen einer aufgenommenen Seite.
-- Kamerabilder werden auf maximal 2400 Pixel Kantenlänge normalisiert und als PDF im A4-Format zusammengefügt.
-- OCR über Tesseract.js (Deutsch und Englisch) liest den Scantext aus.
-- Erkannte Werte werden über den vorhandenen Ergebnisparser verarbeitet und vor dem Speichern angezeigt.
-- Das erzeugte PDF kann separat heruntergeladen werden; nach dem Speichern wird zusätzlich gefragt, ob das PDF gespeichert werden soll.
-- Scans werden nicht automatisch als Datei in IndexedDB abgelegt. Ergebnisdaten werden wie bisher in `shootbook-v1` gespeichert.
-- QR-Code-Import bleibt zurückgestellt.
+## Hinweise und Grenzen
+- OCR und PDF.js benötigen beim Import eine Internetverbindung (CDN-Bibliotheken).
+- OCR-Ergebnisse können insbesondere bei kleinen Ziffern, Zählerlisten und Schusswerten fehlerhaft oder unvollständig sein. Die Vorschau muss vor dem Speichern kontrolliert werden. Nicht sicher erkannte Werte werden nicht als garantiert korrekt ausgegeben.
+- Bei eingescannten PDFs bleiben die Trefferbilder im Dokument erhalten, aber Pfeil-/Richtungssymbole können nicht zuverlässig aus OCR rekonstruiert werden. Für die Pfeile weiterhin möglichst das originale, digitale Meyton-PDF importieren.
+- Die Duplikatprüfung erkennt identische Dateien über SHA-256. Neu gescannte Kopien werden zusätzlich anhand der erkannten Ergebnisdaten verglichen; bei OCR-Abweichungen ist eine Erkennung nicht garantiert.
+- Speicherung bleibt lokal im Browser/IndexedDB. Es gibt keine automatische iCloud-Synchronisierung.
 
-Einschränkungen:
-- OCR funktioniert nur bei ausreichend scharfen, gut beleuchteten und möglichst gerade aufgenommenen Dokumenten.
-- Die Texterkennung ersetzt keine manuelle Kontrolle; bei unvollständigen Daten wird der Scan nicht stillschweigend als korrekt behandelt.
-- Pfeilgrafiken werden beim Kamera-OCR nicht übernommen, da OCR keine originalen PDF-Vektorpfeile extrahiert.
-- Der Scanner nutzt Kamera-/Dateiauswahl des iPhones. Browser und iOS können je nach Berechtigung die Auswahloberfläche unterschiedlich darstellen.
-- Externe Bibliotheken (Tesseract.js und jsPDF) benötigen beim ersten Laden eine Internetverbindung.
+## Installation
+Alle Dateien auf GitHub Pages hochladen und die vorhandenen App-Dateien ersetzen. Die bestehende IndexedDB `shootbook-v1` wird weiterverwendet und nicht gelöscht oder umbenannt.
