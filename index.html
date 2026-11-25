@@ -19,7 +19,7 @@
 </style></head><body><main><div class="headrow"><h1 id="appTitle">Mein Schießbuch ◎</h1><button class="btn settingsBtn" id="settings" aria-label="Einstellungen">⚙</button></div>
 <div class="actions"><label class="btn primary">＋ Foto importieren<input id="photo" type="file" accept="image/*" capture="environment"></label><label class="btn">PDF importieren<input id="pdf" type="file" accept=".pdf,application/pdf" multiple></label><button class="btn" id="manual">＋ Manuell</button><button class="btn" id="backup">Backup</button><button class="btn" id="csv">CSV-Export</button><label class="btn">Backup laden<input id="restore" type="file" accept=".json"></label></div>
 <div class="tabs"><button class="active" data-tab="competition">Wettkämpfe</button><button data-tab="training">Training</button></div><div id="dash"></div><div class="panel"><h2>Alle Einheiten</h2><div class="sub">Eintrag antippen für Details</div><button class="btn filter-toggle" id="toggleFilters" type="button" aria-expanded="false">Filter anzeigen</button><div class="filters" id="filtersPanel" hidden><div class="field filter-search"><label for="filterText">Suche</label><input id="filterText" type="search" placeholder="Datum, Ergebnis, Teiler …"></div><div class="field"><label for="filterFrom">Von</label><input id="filterFrom" type="date"></div><div class="field"><label for="filterTo">Bis</label><input id="filterTo" type="date"></div><div class="field"><label for="filterDiscipline">Disziplin</label><select id="filterDiscipline"><option value="">Alle Disziplinen</option><option>LG 60 ZR</option><option>LG 40 ZR</option></select></div><button class="btn" id="clearFilters">Filter zurücksetzen</button></div><div id="list"></div></div>
-<footer>Speicherung lokal im Browser. Für eine iCloud-Kopie „Backup“ wählen und die JSON-Datei in iCloud Drive speichern. Keine automatische iCloud-Synchronisierung. PDF-Textauswertung benötigt beim Import eine Internetverbindung.<div style="text-align:center;margin-top:14px;font-weight:700;letter-spacing:1px">Version 1.3.4</div></footer></main>
+<footer>Speicherung lokal im Browser. Für eine iCloud-Kopie „Backup“ wählen und die JSON-Datei in iCloud Drive speichern. Keine automatische iCloud-Synchronisierung. PDF-Textauswertung benötigt beim Import eine Internetverbindung.<div style="text-align:center;margin-top:14px;font-weight:700;letter-spacing:1px">Version 1.3.5</div></footer></main>
 <div class="modal" id="modal"><div class="sheet"><button class="btn" id="close">Schließen</button><div id="body"></div></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script>
 if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -139,28 +139,112 @@ async function ocrPage(page){
   } finally {await worker.terminate();canvas.width=canvas.height=1;}
 }
 
-async function ocrImageCanvas(canvas){
- if(!window.Tesseract)await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
+
+function normalizeShotToken(token){
+ const raw=String(token||'').trim().replace(/^[^0-9]+|[^0-9.,].*$/g,'');
+ let m=raw.match(/^(10|[0-9])[.,]?([0-9])/);
+ if(!m)return null;
+ const value=Number(m[1]+'.'+m[2]);
+ return Number.isFinite(value)&&value>=0&&value<=10.9?value.toFixed(1):null;
+}
+function extractShotValues(text){
+ const lines=String(text||'').split(/\r?\n/);
+ const shotLines=lines.slice(1).filter(line=>!/beste\s+Teiler|Trefferkreis|Trefferlage/i.test(line));
+ const values=[];
+ for(const line of shotLines){
+  for(const token of line.trim().split(/\s+/)){
+   const value=normalizeShotToken(token);
+   if(value!==null)values.push(value);
+  }
+  if(values.length>=10)break;
+ }
+ return values.slice(0,10);
+}
+function cropArrow(canvas,bbox){
+ if(!bbox)return null;
+ const bw=Math.max(1,bbox.x1-bbox.x0),bh=Math.max(1,bbox.y1-bbox.y0);
+ // The printed direction mark sits immediately after the decimal shot value.
+ const x0=Math.max(0,Math.min(canvas.width-1,Math.round(bbox.x0+bw*.70)));
+ const y0=Math.max(0,Math.min(canvas.height-1,Math.round(bbox.y0-bh*.08)));
+ const x1=Math.max(x0+1,Math.min(canvas.width,Math.round(bbox.x1+bh*.55)));
+ const y1=Math.max(y0+1,Math.min(canvas.height,Math.round(bbox.y1+bh*.12)));
+ const crop=document.createElement('canvas');crop.width=x1-x0;crop.height=y1-y0;
+ const cc=crop.getContext('2d',{willReadFrequently:true});cc.drawImage(canvas,x0,y0,crop.width,crop.height,0,0,crop.width,crop.height);
+ const im=cc.getImageData(0,0,crop.width,crop.height);let visible=0;
+ for(let k=0;k<im.data.length;k+=4){
+  const lum=(im.data[k]+im.data[k+1]+im.data[k+2])/3;
+  const alpha=lum<190?255:0;if(alpha)visible++;
+  im.data[k]=im.data[k+1]=im.data[k+2]=0;im.data[k+3]=alpha;
+ }
+ if(visible<2)return null;
+ cc.putImageData(im,0,0);return crop.toDataURL('image/png');
+}
+async function recognizeCanvas(canvas,psm='6'){
  const worker=await Tesseract.createWorker('deu+eng');
  try{
-  await worker.setParameters({tessedit_pageseg_mode:'4',preserve_interword_spaces:'1',user_defined_dpi:'300'});
-  const result=await worker.recognize(canvas),data=result.data||{},words=data.words||[],arrows=[];
-  const shotWord=/^(?:10|[0-9])[.,][0-9](?:\\*|[*′'’])?$/;
-  for(const word of words){
-   if(!shotWord.test((word.text||'').trim())||!word.bbox)continue;
-   const b=word.bbox,x=Math.max(0,Math.min(canvas.width-1,Math.round(b.x1+1)));
-   const y=Math.max(0,Math.min(canvas.height-1,Math.round((b.y0+b.y1)/2-10)));
-   const w=Math.max(1,Math.min(38,canvas.width-x)),h=Math.max(1,Math.min(28,canvas.height-y));
-   if(w<5||h<5){arrows.push(null);continue}
-   const crop=document.createElement('canvas');crop.width=w;crop.height=h;
-   const cc=crop.getContext('2d',{willReadFrequently:true});cc.drawImage(canvas,x,y,w,h,0,0,w,h);
-   const im=cc.getImageData(0,0,w,h);let visible=0;
-   for(let k=0;k<im.data.length;k+=4){const lum=(im.data[k]+im.data[k+1]+im.data[k+2])/3;const alpha=lum<205?255:0;if(alpha)visible++;im.data[k]=im.data[k+1]=im.data[k+2]=0;im.data[k+3]=alpha}
-   if(visible<3){arrows.push(null);continue}
-   cc.putImageData(im,0,0);arrows.push(crop.toDataURL('image/png'));
-  }
-  return{text:data.text||'',arrows};
+  await worker.setParameters({tessedit_pageseg_mode:psm,preserve_interword_spaces:'1',user_defined_dpi:'300'});
+  const result=await worker.recognize(canvas);
+  return {text:result.data?.text||'',words:result.data?.words||[]};
  }finally{await worker.terminate()}
+}
+async function ocrImageCanvas(canvas){
+ if(!window.Tesseract)await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
+ // First pass reads the page header and general metadata.
+ const full=await recognizeCanvas(canvas,'4');
+ const W=canvas.width,H=canvas.height;
+ // Read the counter area separately; OCR often merges the eleven counts into one digit string.
+ const countCanvas=document.createElement('canvas');
+ countCanvas.width=Math.round(W*.88);countCanvas.height=Math.round(H*.19);
+ countCanvas.getContext('2d').drawImage(canvas,Math.round(W*.08),Math.round(H*.115),countCanvas.width,countCanvas.height,0,0,countCanvas.width,countCanvas.height);
+ const countPass=await recognizeCanvas(countCanvas,'6');
+ const seriesTexts=[],regionalShots=[],regionalArrows=[];
+ for(let i=0;i<6;i++){
+  // Meyton LG score sheets place the six ten-shot blocks in evenly spaced horizontal bands.
+  const y0=Math.round(H*(.295+i*.105)),y1=Math.min(H,Math.round(H*(.405+i*.105)));
+  const x0=Math.round(W*.23),x1=Math.round(W*.97);
+  const region=document.createElement('canvas');region.width=x1-x0;region.height=y1-y0;
+  region.getContext('2d',{willReadFrequently:true}).drawImage(canvas,x0,y0,region.width,region.height,0,0,region.width,region.height);
+  const pass=await recognizeCanvas(region,'6');
+  seriesTexts.push(pass.text);
+  const values=extractShotValues(pass.text);regionalShots.push(values);
+  const candidates=(pass.words||[]).filter(w=>{
+   const v=normalizeShotToken(w.text);
+   // Exclude the series heading above and divider/grouping metadata below the two shot rows.
+   return v!==null&&w.bbox&&w.bbox.y0>region.height*.18&&w.bbox.y0<region.height*.56;
+  }).sort((a,b)=>a.bbox.y0-b.bbox.y0||a.bbox.x0-b.bbox.x0).slice(0,10);
+  regionalArrows.push(candidates.map(w=>cropArrow(region,w.bbox)));
+ }
+ return {
+  text:full.text+'\n'+countPass.text,
+  arrows:regionalArrows.flat(),
+  regionalShots,
+  regionalArrows,
+  countText:countPass.text
+ };
+}
+function recoverCounts(countText,seriesWhole){
+ const lines=String(countText||'').split(/\r?\n/);
+ let line=lines.find(v=>/z[aäa]hler/i.test(v))||'';
+ if(!line)line=lines.find(v=>/[0-9]{8,}/.test(v))||'';
+ const digits=(line.match(/[0-9]{8,}/g)||[]).sort((a,b)=>b.length-a.length)[0];
+ if(!digits)return [];
+ const totalShots=seriesWhole?.length?seriesWhole.length*10:60;
+ const wholeScore=seriesWhole?.length?seriesWhole.reduce((a,b)=>a+Number(b||0),0):null;
+ if(wholeScore==null)return [];
+ const solutions=[];
+ const walk=(pos,values,sum,weighted)=>{
+  const idx=values.length;
+  if(idx===11){if(pos===digits.length&&sum===totalShots&&weighted===wholeScore)solutions.push(values);return}
+  const remaining=10-idx;
+  for(const len of [1,2]){
+   if(pos+len>digits.length||digits.length-(pos+len)<remaining)continue;
+   const token=digits.slice(pos,pos+len);if(len===2&&token[0]==='0')continue;
+   const value=Number(token);if(value>60||sum+value>totalShots||weighted+value*(10-idx)>wholeScore)continue;
+   walk(pos+len,[...values,value],sum+value,weighted+value*(10-idx));
+  }
+ };
+ walk(0,[],0,0);
+ return solutions.length===1?solutions[0]:[];
 }
 async function photoToPdf(canvas){
  if(!window.jspdf?.jsPDF)await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
@@ -246,9 +330,16 @@ document.getElementById('photo').onchange=async e=>{
   const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();
   const pdfBlob=await photoToPdf(canvas),scan=await ocrImageCanvas(canvas);
   const pseudoFile={name:(f.name||'Foto').replace(/\.[^.]+$/,'')+'.pdf'};
-  const x=parse(scan.text,pseudoFile,scan.arrows);x.fileHash=await sha256(f);x.sourceType='Foto-OCR';x.scanPdf=true;
+  const x=parse(scan.text,pseudoFile,scan.arrows);
+  if(Array.isArray(scan.regionalShots)&&scan.regionalShots.length===6){
+   x.shots=scan.regionalShots.map(a=>a.map(v=>Number(v)));
+   x.shotArrows=scan.regionalArrows;
+  }
+  const recoveredCounts=recoverCounts(scan.countText,x.seriesWhole);
+  if(recoveredCounts.length===11)x.counts=recoveredCounts;
+  x.fileHash=await sha256(f);x.sourceType='Foto-OCR';x.scanPdf=true;
   const dupe=duplicateOf(x),shotsOk=(x.shots||[]).length===x.series.length&&(x.shots||[]).every(a=>a.length===10),countsOk=(x.counts||[]).length===11;
-  modal(`<h2>Foto-Import kontrollieren</h2><p class="sub">${f.name} · Foto erkannt · PDF automatisch erstellt</p><div class="field"><label>Kategorie</label><select id="kind"><option value="competition" ${x.kind==='competition'?'selected':''}>Wettkampf</option><option value="training" ${x.kind==='training'?'selected':''}>Training</option></select></div><p>Schütze: <b>${x.shooter||'Nicht erkannt'}</b> · StartNr.: <b>${x.startNo||'—'}</b> · StandNr.: <b>${x.standNo||'—'}</b></p><p>Verein: <b>${x.club||'Nicht erkannt'}</b></p><p>Disziplin: <b>${x.discipline}</b> · Datum: <b>${date(x.date)}</b></p><p>Ergebnis: <b>${fmt(x.score)} (${x.scoreDetail||'Ganzringe nicht erkannt'})</b></p><p>Serien: ${(x.series||[]).map((v,i)=>fmt(v)+' ('+(x.seriesWhole?.[i]??'—')+')').join(' · ')||'Nicht erkannt'}</p><p>Innenzehner: ${x.tens}</p><p>Zähler 10er bis 0er: ${(x.counts||[]).join(' · ')||'Nicht erkannt'} ${countsOk?'':'⚠ unvollständig'}</p><p>Einzelschüsse je Serie: ${(x.shots||[]).map(a=>a.length).join(' / ')||'Nicht erkannt'} ${shotsOk?'':'⚠ nicht alle zehn erkannt'}</p><p>Weiteste: ${(x.farthest||[]).join(' · ')||'Nicht erkannt'}</p><p>Beste Teiler: ${(x.dividers||[]).join(' · ')||'Nicht erkannt'}</p><p>Trefferkreis: ${x.group!=null?fmt(x.group)+' mm':'Nicht erkannt'} · Trefferlage: ${x.position||'Nicht erkannt'}</p><p>Schusspfeile: ${(x.shotArrows||[]).flat().filter(Boolean).length} erkannt. Bei Fotos können kleine Pfeile unleserlich bleiben.</p>${dupe?'<p style="color:#ffbd70;font-weight:700">Mögliches Duplikat: Dieses Ergebnis ist bereits gespeichert.</p>':''}<p class="sub">Das Foto wurde in ein PDF umgewandelt. Bitte Werte kontrollieren, bevor du speicherst.</p><button class="btn" id="saveScanPdf">Erstelltes PDF speichern</button> <button class="btn primary" id="confirm">${dupe?'Trotzdem importieren':'Ergebnis speichern'}</button>`);
+  modal(`<h2>Foto-Import kontrollieren</h2><p class="sub">${f.name} · Foto erkannt · PDF automatisch erstellt</p><div class="field"><label>Kategorie</label><select id="kind"><option value="competition" ${x.kind==='competition'?'selected':''}>Wettkampf</option><option value="training" ${x.kind==='training'?'selected':''}>Training</option></select></div><p>Schütze: <b>${x.shooter||'Nicht erkannt'}</b> · StartNr.: <b>${x.startNo||'—'}</b> · StandNr.: <b>${x.standNo||'—'}</b></p><p>Verein: <b>${x.club||'Nicht erkannt'}</b></p><p>Disziplin: <b>${x.discipline}</b> · Datum: <b>${date(x.date)}</b></p><p>Ergebnis: <b>${fmt(x.score)} (${x.scoreDetail||'Ganzringe nicht erkannt'})</b></p><p>Serien: ${(x.series||[]).map((v,i)=>fmt(v)+' ('+(x.seriesWhole?.[i]??'—')+')').join(' · ')||'Nicht erkannt'}</p><p>Innenzehner: ${x.tens}</p><p>Zähler 10er bis 0er: ${(x.counts||[]).join(' · ')||'Nicht erkannt'} ${countsOk?'':'⚠ unvollständig'}</p><p>Einzelschüsse je Serie: ${(x.shots||[]).map(a=>a.length).join(' / ')||'Nicht erkannt'} ${shotsOk?'':'⚠ nicht alle zehn erkannt'}</p><p>Weiteste: ${(x.farthest||[]).join(' · ')||'Nicht erkannt'}</p><p>Beste Teiler: ${(x.dividers||[]).join(' · ')||'Nicht erkannt'}</p><p>Trefferkreis: ${x.group!=null?fmt(x.group)+' mm':'Nicht erkannt'} · Trefferlage: ${x.position||'Nicht erkannt'}</p><p>Schusspfeile: ${(x.shotArrows||[]).flat().filter(Boolean).length} Bildausschnitte erkannt. Nicht sicher erkennbare Pfeile bleiben leer.</p>${dupe?'<p style="color:#ffbd70;font-weight:700">Mögliches Duplikat: Dieses Ergebnis ist bereits gespeichert.</p>':''}<p class="sub">Das Foto wurde in ein PDF umgewandelt. Bitte Werte kontrollieren, bevor du speicherst.</p><button class="btn" id="saveScanPdf">Erstelltes PDF speichern</button> <button class="btn primary" id="confirm">${dupe?'Trotzdem importieren':'Ergebnis speichern'}</button>`);
   document.getElementById('saveScanPdf').onclick=()=>downloadBlob(pdfBlob,pseudoFile.name);
   await new Promise(resolve=>document.getElementById('confirm').onclick=async()=>{
    x.kind=document.getElementById('kind').value;

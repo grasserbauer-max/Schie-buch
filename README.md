@@ -1,15 +1,19 @@
-# Mein Schießbuch v1.3.4
+# Mein Schießbuch v1.3.5
 
 ## Änderungen
-- Neuer Foto-Import über iPhone-Kamera oder Fotomediathek.
-- Bild wird automatisch aufbereitet, per OCR ausgewertet und als A4-PDF erzeugt.
-- Das erzeugte PDF kann aus der Importvorschau gespeichert werden; nach dem Speichern wird es ebenfalls angeboten.
-- Die bestehende PDF-Importfunktion bleibt erhalten.
-- Redundante Serien-Zusammenfassungszeile (Trefferkreis/Trefferlage/beste Teiler) aus der Detailansicht entfernt.
-- Duplikatprüfung für Fotoimporte nutzt Datei-Hash und den Vergleich der Ergebnisdaten.
+- Fotoimport bleibt der primäre neue Weg: Foto aus Mediathek wählen oder mit der iPhone-Kamera aufnehmen.
+- Das Foto wird automatisch in ein A4-PDF umgewandelt; PDF kann aus der Vorschau gespeichert werden.
+- OCR liest die Seite weiterhin für Kopf- und Ergebnisdaten.
+- Bei LG 60 ZR werden die sechs Serienbereiche zusätzlich separat erkannt, um die zehn Einzelschüsse pro Serie zuverlässiger zu erfassen.
+- Zähler werden separat aus dem oberen Ergebnisbereich gelesen und anhand der Schussanzahl und Summe der Ganzringe plausibilisiert.
+- Schusspfeile werden als kleine Bildausschnitte neben den erkannten Schusswerten extrahiert und positionsbezogen je Serie gespeichert.
+- Trefferbilder/Zielscheiben werden nicht gespeichert oder angezeigt.
+- Die vorhandene PDF-Importmöglichkeit und Duplikatprüfung bleiben erhalten.
 - IndexedDB-Datenbank `shootbook-v1` bleibt unverändert.
 
 ## Hinweise
-- Für OCR und PDF-Erzeugung ist beim Import eine Internetverbindung erforderlich (Tesseract.js und jsPDF werden von CDNs geladen).
-- Die Erkennung von Einzelschüssen und Pfeilen hängt von Bildqualität, Schärfe, Perspektive und Beleuchtung ab. Unvollständige Werte werden in der Vorschau angezeigt und müssen vor dem Speichern kontrolliert werden.
-- Kein tatsächlicher iPhone-Feldtest wurde durchgeführt.
+- OCR und PDF-Erstellung benötigen beim Import eine Internetverbindung (Tesseract.js und jsPDF via CDN).
+- Die OCR-Qualität hängt von Schärfe, Auflösung, Beleuchtung und Perspektive des Fotos ab.
+- Unvollständige oder unsichere Erkennungen müssen in der Vorschau kontrolliert werden.
+- Die Serienbereich-Erkennung ist auf das Layout der Meyton-LG-60-ZR-Ergebnisblätter ausgerichtet. LG 40 ZR verwendet weiterhin den bisherigen OCR-Pfad.
+- Ein realer iPhone-Test wurde nicht durchgeführt.
