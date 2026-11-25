@@ -16,12 +16,22 @@
 .panel{min-width:0;overflow:hidden}
 .field{min-width:0}
 .field input,.field select{box-sizing:border-box;min-width:0;max-width:100%}.chartTip{font-size:12px;color:var(--muted);margin-top:8px;min-height:18px}.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:5px}.field input,.field select{width:100%;padding:11px;border-radius:9px;background:var(--p2);color:white;border:1px solid var(--line)}.series{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.series div{background:var(--p2);padding:10px;border-radius:9px}.series b{display:block;margin-top:4px}footer{font-size:11px;line-height:1.5;color:var(--muted);margin-top:24px}
+.scanPreview{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}
+.scanPage{background:var(--p2);border-radius:10px;padding:8px;min-width:0}
+.scanPage img{width:100%;height:170px;object-fit:contain;background:#fff;border-radius:6px}
+.scanPage button{width:100%;margin-top:6px}
+.scanActions{display:flex;gap:8px;flex-wrap:wrap}
+.scanActions .btn{flex:1;min-width:120px}
+@media(max-width:420px){.scanPreview{grid-template-columns:1fr 1fr}.scanPage img{height:135px}}
 </style></head><body><main><div class="headrow"><h1 id="appTitle">Mein Schießbuch ◎</h1><button class="btn settingsBtn" id="settings" aria-label="Einstellungen">⚙</button></div>
-<div class="actions"><label class="btn primary">＋ PDF importieren<input id="pdf" type="file" accept=".pdf,application/pdf" multiple></label><button class="btn" id="manual">＋ Manuell</button><button class="btn" id="backup">Backup</button><button class="btn" id="csv">CSV-Export</button><label class="btn">Backup laden<input id="restore" type="file" accept=".json"></label></div>
+<div class="actions"><label class="btn primary">＋ PDF importieren<input id="pdf" type="file" accept=".pdf,application/pdf" multiple></label><button class="btn" id="scan">Dokument scannen</button><input id="scanCamera" type="file" accept="image/*" capture="environment" hidden><button class="btn" id="manual">＋ Manuell</button><button class="btn" id="backup">Backup</button><button class="btn" id="csv">CSV-Export</button><label class="btn">Backup laden<input id="restore" type="file" accept=".json"></label></div>
 <div class="tabs"><button class="active" data-tab="competition">Wettkämpfe</button><button data-tab="training">Training</button></div><div id="dash"></div><div class="panel"><h2>Alle Einheiten</h2><div class="sub">Eintrag antippen für Details</div><button class="btn filter-toggle" id="toggleFilters" type="button" aria-expanded="false">Filter anzeigen</button><div class="filters" id="filtersPanel" hidden><div class="field filter-search"><label for="filterText">Suche</label><input id="filterText" type="search" placeholder="Datum, Ergebnis, Teiler …"></div><div class="field"><label for="filterFrom">Von</label><input id="filterFrom" type="date"></div><div class="field"><label for="filterTo">Bis</label><input id="filterTo" type="date"></div><div class="field"><label for="filterDiscipline">Disziplin</label><select id="filterDiscipline"><option value="">Alle Disziplinen</option><option>LG 60 ZR</option><option>LG 40 ZR</option></select></div><button class="btn" id="clearFilters">Filter zurücksetzen</button></div><div id="list"></div></div>
-<footer>Speicherung lokal im Browser. Für eine iCloud-Kopie „Backup“ wählen und die JSON-Datei in iCloud Drive speichern. Keine automatische iCloud-Synchronisierung. PDF-Textauswertung benötigt beim Import eine Internetverbindung.<div style="text-align:center;margin-top:14px;font-weight:700;letter-spacing:1px">Version 1.2.9</div></footer></main>
+<footer>Speicherung lokal im Browser. Für eine iCloud-Kopie „Backup“ wählen und die JSON-Datei in iCloud Drive speichern. Keine automatische iCloud-Synchronisierung. PDF-Textauswertung benötigt beim Import eine Internetverbindung.<div style="text-align:center;margin-top:14px;font-weight:700;letter-spacing:1px">Version 1.3.0</div></footer></main>
 <div class="modal" id="modal"><div class="sheet"><button class="btn" id="close">Schließen</button><div id="body"></div></div></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>window.__loadTesseract=()=>new Promise((resolve,reject)=>{if(window.Tesseract)return resolve(window.Tesseract);let q=document.createElement('script');q.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';q.onload=()=>resolve(window.Tesseract);q.onerror=()=>reject(Error('OCR-Bibliothek konnte nicht geladen werden.'));document.head.appendChild(q)});</script>
+<script>
 if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 const DB='shootbook-v1',STORE='r';let db,rows=[],tab='competition';
 const DEFAULT_SETTINGS={name:'',theme:'green',background:'#0b1220',enableLG40:false};
@@ -180,6 +190,82 @@ if(d){let [day,mon,year,time]=d.match(/(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}:\d{2})
 return{id:crypto.randomUUID(),kind:probe?'training':'competition',discipline,seriesCount:series.length,date:dt.toISOString(),score:Number(rm[1].replace(',','.')),scoreDetail:rm[2]||'',tens,series,seriesWhole,counts,farthest,dividers,group:groupMatch?Number(groupMatch[0].replace(',','.')):null,position,shots,shotArrows,file:f.name}
 }
 function duplicateOf(x){return rows.find(r=>r.kind===x.kind&&(r.discipline||'LG 60 ZR')===(x.discipline||'LG 60 ZR')&&Math.abs(new Date(r.date)-new Date(x.date))<120000&&Math.abs(Number(r.score)-Number(x.score))<0.051&&JSON.stringify(r.series||[])===JSON.stringify(x.series||[]))}
+
+let scanPages=[],scanPdfBlob=null;
+const scanInput=document.getElementById('scanCamera');
+function scanModal(){modal(`<h2>Dokument scannen</h2>
+<p class="sub">Fotografiere deinen Ergebniszettel. Du kannst eine oder zwei Seiten aufnehmen.</p>
+<div class="scanActions"><button class="btn primary" id="takeScan">Seite fotografieren</button><button class="btn" id="finishScan" ${scanPages.length?'':'disabled'}>Scan abschließen</button></div>
+<div class="scanPreview" id="scanPreview">${scanPages.map((p,i)=>`<div class="scanPage"><img src="${p.url}" alt="Scanseite ${i+1}"><small>Seite ${i+1}</small><button class="btn" data-remove-scan="${i}">Entfernen</button></div>`).join('')}</div>
+<p class="sub" id="scanStatus">${scanPages.length} von 2 Seiten aufgenommen.</p>`);
+document.getElementById('takeScan').onclick=()=>{if(scanPages.length>=2)return alert('Es sind maximal zwei Seiten möglich.');scanInput.click()};
+document.querySelectorAll('[data-remove-scan]').forEach(b=>b.onclick=()=>{let i=Number(b.dataset.removeScan);URL.revokeObjectURL(scanPages[i].url);scanPages.splice(i,1);scanModal()});
+document.getElementById('finishScan').onclick=processScan;
+}
+document.getElementById('scan').onclick=()=>{scanPages.forEach(p=>URL.revokeObjectURL(p.url));scanPages=[];scanModal()};
+scanInput.onchange=async e=>{
+ let file=e.target.files?.[0];e.target.value='';if(!file)return;
+ if(scanPages.length>=2)return alert('Es sind maximal zwei Seiten möglich.');
+ if(!file.type.startsWith('image/'))return alert('Bitte ein Bild aufnehmen.');
+ let bitmap=await createImageBitmap(file);
+ // Normalize orientation and scale down only oversized camera images to keep PDF manageable.
+ let max=2400,scale=Math.min(1,max/Math.max(bitmap.width,bitmap.height)),canvas=document.createElement('canvas');
+ canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(bitmap.height*scale);
+ let ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();
+ let blob=await new Promise(r=>canvas.toBlob(r,'image/jpeg',0.88));
+ scanPages.push({blob,url:URL.createObjectURL(blob),canvas});
+ scanModal();
+};
+async function processScan(){
+ if(!scanPages.length)return;
+ let status=document.getElementById('scanStatus');document.getElementById('finishScan').disabled=true;document.getElementById('takeScan').disabled=true;
+ try{
+   status.textContent='OCR wird geladen …';
+   let T=await window.__loadTesseract();
+   let worker=await T.createWorker('deu+eng');
+   let recognized=[];
+   for(let i=0;i<scanPages.length;i++){
+     status.textContent=`Seite ${i+1} von ${scanPages.length} wird gelesen …`;
+     let result=await worker.recognize(scanPages[i].canvas);
+     recognized.push(result.data.text||'');
+   }
+   await worker.terminate();
+   let text=recognized.join('\n');
+   let jsPDF=window.jspdf?.jsPDF;if(!jsPDF)throw Error('PDF-Erstellung ist nicht verfügbar. Bitte Seite mit Internetverbindung neu laden.');
+   let pdf=new jsPDF({orientation:'portrait',unit:'pt',format:'a4',compress:true});
+   scanPages.forEach((page,i)=>{
+     if(i)pdf.addPage('a4','portrait');
+     let img=page.canvas.toDataURL('image/jpeg',0.88),pw=595.28,ph=841.89,ratio=Math.min(pw/page.canvas.width,ph/page.canvas.height),w=page.canvas.width*ratio,h=page.canvas.height*ratio;
+     pdf.addImage(img,'JPEG',(pw-w)/2,(ph-h)/2,w,h,undefined,'FAST');
+   });
+   scanPdfBlob=pdf.output('blob');
+   let scanFile=new File([scanPdfBlob],`Scan-${new Date().toISOString().slice(0,10)}.pdf`,{type:'application/pdf'});
+   let parsed=parse(text,scanFile,[]);
+   parsed.shotArrows=(parsed.shots||[]).map(a=>a.map(()=>null));
+   showScanImport(parsed,text,scanFile.name);
+ }catch(err){
+   status.textContent='Erkennung nicht erfolgreich.';
+   alert('Scan konnte nicht vollständig ausgewertet werden: '+err.message+'\nDu kannst die Seiten erneut aufnehmen oder die Daten manuell erfassen.');
+   document.getElementById('modal').classList.remove('show');
+ } 
+}
+function showScanImport(x,ocrText,fileName){
+ modal(`<h2>Scan-Ergebnis kontrollieren</h2><p class="sub">${fileName} · ${scanPages.length} Seite(n)</p>
+ <div class="field"><label>Kategorie</label><select id="scanKind"><option value="competition" ${x.kind==='competition'?'selected':''}>Wettkampf</option><option value="training" ${x.kind==='training'?'selected':''}>Training</option></select></div>
+ <p>Disziplin: <b>${x.discipline}</b></p><p>Datum: <b>${date(x.date)}</b></p><p>Gesamtergebnis: <b>${fmt(x.score)} ${x.scoreDetail?'('+x.scoreDetail+')':''}</b></p>
+ <p>Serien: ${(x.series||[]).map(fmt).join(' · ')||'Nicht erkannt'}</p><p>Innenzehner: ${x.tens}</p><p>Einzelschüsse je Serie: ${(x.shots||[]).map(a=>a.length).join(' / ')||'Nicht erkannt'}</p>
+ <p class="sub">OCR-Texterkennung kann Fehler enthalten. Prüfe die Werte vor dem Speichern. Die Pfeile der Einzelschüsse können bei einem Kamerascan nicht zuverlässig übernommen werden.</p>
+ <div class="scanActions"><button class="btn primary" id="saveScan">Ergebnis speichern</button><button class="btn" id="downloadScanPdf">Scan-PDF speichern</button></div>`);
+ document.getElementById('downloadScanPdf').onclick=()=>downloadBlob(scanPdfBlob,`Schiessbuch-Scan-${new Date().toISOString().slice(0,10)}.pdf`);
+ document.getElementById('saveScan').onclick=async()=>{
+   x.kind=document.getElementById('scanKind').value;
+   let dupe=duplicateOf(x);
+   if(dupe&&!confirm('Dieses Ergebnis scheint bereits vorhanden zu sein. Trotzdem speichern?'))return;
+   await put(x);rows=await all();document.getElementById('modal').classList.remove('show');render();
+   if(confirm('Ergebnis gespeichert. Möchtest du jetzt auch das Scan-PDF speichern?'))downloadBlob(scanPdfBlob,`Schiessbuch-Scan-${new Date().toISOString().slice(0,10)}.pdf`);
+   scanPages.forEach(p=>URL.revokeObjectURL(p.url));scanPages=[];scanPdfBlob=null;
+ };
+}
 document.getElementById('pdf').onchange=async e=>{for(let f of e.target.files){try{let extracted=await pdfText(f),x=parse(extracted.text,f,extracted.flatArrows);modal(`<h2>PDF-Import kontrollieren</h2><p class="sub">${f.name}</p><div class="field"><label>Kategorie</label><select id="kind"><option value="competition" ${x.kind==='competition'?'selected':''}>Wettkampf</option><option value="training" ${x.kind==='training'?'selected':''}>Training</option></select></div><p>Disziplin: <b>${x.discipline||"LG 60 ZR"}</b></p><p>Ergebnis: <b>${fmt(x.score)}</b></p><p>Serien: ${(x.series||[]).map(fmt).join(' · ')||'nicht erkannt'}</p><p>Innenzehner: ${x.tens}</p><p>Zähler 10er bis 0er: ${(x.counts||[]).join(' · ')||'nicht erkannt'}</p><p>Einzelschüsse je Serie: ${(x.shots||[]).map(a=>a.length).join(' / ')||'nicht erkannt'} (sollte jeweils 10 sein)</p><p>Pfeile aus PDF erkannt: ${(x.shotArrows||[]).flat().filter(Boolean).length} von ${(x.shots||[]).reduce((n,a)=>n+a.length,0)}</p><p>Weiteste: ${(x.farthest||[]).join(' · ')||'nicht erkannt'}</p><p>Beste Teiler: ${(x.dividers||[]).join(' · ')||'nicht erkannt'}</p><p>Trefferkreis: ${x.group!=null?fmt(x.group)+' mm':'nicht erkannt'}</p><p>Trefferlage: ${x.position||'nicht erkannt'}</p><button class="btn primary" id="confirm">Speichern</button>`);await new Promise(resolve=>document.getElementById('confirm').onclick=async()=>{x.kind=document.getElementById('kind').value;let dupe=duplicateOf(x);if(dupe&&x.shotArrows?.some(row=>row.some(Boolean))){dupe.shots=x.shots;dupe.shotArrows=x.shotArrows;await put(dupe);rows=await all();document.getElementById('modal').classList.remove('show');render();alert('Vorhandener Eintrag wurde um die PDF-Pfeile ergänzt.');resolve();return}if(dupe&&!confirm('Dieses Ergebnis scheint bereits gespeichert zu sein (gleiches Datum, Disziplin und Ergebnis). Trotzdem importieren?')){document.getElementById('modal').classList.remove('show');resolve();return}await put(x);rows=await all();document.getElementById('modal').classList.remove('show');render();resolve()})}catch(err){alert(f.name+': '+err.message)}}e.target.value=''};
 
 function downloadBlob(blob,name){let a=document.createElement('a'),u=URL.createObjectURL(blob);a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1500)}

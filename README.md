@@ -1,15 +1,21 @@
-# Schießbuch – Version 1.2.9
+# Schießbuch – Version 1.3.0
 
-Änderungen gegenüber 1.2.8:
-- PDF-Import rendert die Meyton-PDF-Seite und extrahiert die kleinen Richtungspfeile als transparente Bildausschnitte direkt aus dem PDF.
-- Die Pfeile werden in der Detailansicht neben dem jeweiligen Einzelschuss angezeigt.
-- Es werden keine Pfeile berechnet oder aus Ringzahlen abgeleitet. Wenn im PDF an der Schussposition kein Pfeil erkannt wird, bleibt die Stelle leer.
-- Die Pfeilform und -richtung stammen aus dem PDF; die Farbe wird für die Lesbarkeit auf dem dunklen App-Design invertiert.
-- Im Importdialog wird angezeigt, wie viele Pfeile erkannt wurden.
-- Bereits gespeicherte, doppelte Ergebnisse können durch erneuten PDF-Import um die Pfeilbilder ergänzt werden, ohne einen zweiten Eintrag anzulegen.
-- Neue Pfeildaten werden im bestehenden IndexedDB-Datensatz gespeichert und sind im JSON-Backup enthalten.
-- Bestehende Datenbank `shootbook-v1` bleibt unverändert.
-- QR-Code-Import weiterhin zurückgestellt.
+Neue Funktion: Dokumentenscanner im PDF-Import-Bereich.
 
-Hinweis zur Aktualisierung bestehender Einträge:
-Bereits gespeicherte Ergebnisse enthalten noch keine Pfeilbilder. Nach dem App-Update das jeweilige Original-PDF erneut importieren. Erkennt die App denselben Wettkampf/dasselbe Training wieder, ergänzt sie den vorhandenen Eintrag um die Pfeile, statt einen zweiten Eintrag anzulegen.
+- Zusätzlicher Button „Dokument scannen“ neben „PDF importieren“.
+- iPhone-Kamera wird über den nativen Datei-/Kamera-Dialog aufgerufen.
+- Unterstützt eine oder zwei aufgenommene Seiten.
+- Seitenvorschau und Entfernen einer aufgenommenen Seite.
+- Kamerabilder werden auf maximal 2400 Pixel Kantenlänge normalisiert und als PDF im A4-Format zusammengefügt.
+- OCR über Tesseract.js (Deutsch und Englisch) liest den Scantext aus.
+- Erkannte Werte werden über den vorhandenen Ergebnisparser verarbeitet und vor dem Speichern angezeigt.
+- Das erzeugte PDF kann separat heruntergeladen werden; nach dem Speichern wird zusätzlich gefragt, ob das PDF gespeichert werden soll.
+- Scans werden nicht automatisch als Datei in IndexedDB abgelegt. Ergebnisdaten werden wie bisher in `shootbook-v1` gespeichert.
+- QR-Code-Import bleibt zurückgestellt.
+
+Einschränkungen:
+- OCR funktioniert nur bei ausreichend scharfen, gut beleuchteten und möglichst gerade aufgenommenen Dokumenten.
+- Die Texterkennung ersetzt keine manuelle Kontrolle; bei unvollständigen Daten wird der Scan nicht stillschweigend als korrekt behandelt.
+- Pfeilgrafiken werden beim Kamera-OCR nicht übernommen, da OCR keine originalen PDF-Vektorpfeile extrahiert.
+- Der Scanner nutzt Kamera-/Dateiauswahl des iPhones. Browser und iOS können je nach Berechtigung die Auswahloberfläche unterschiedlich darstellen.
+- Externe Bibliotheken (Tesseract.js und jsPDF) benötigen beim ersten Laden eine Internetverbindung.
