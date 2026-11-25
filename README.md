@@ -1,19 +1,20 @@
-# Mein Schießbuch v1.3.7
+# Mein Schießbuch v1.3.8
 
 ## Änderungen
-- Fotoimport: keine Pfeilerkennung, keine Pfeilausschnitte und keine Pfeilspeicherung.
-- PDF-Import: bestehende Extraktion der Schusspfeile aus dem Original-PDF bleibt erhalten.
-- Foto-OCR: Serienwerte können zusätzlich aus der Kopfzeile „Serien:“ gelesen werden, falls die einzelnen Serienüberschriften nicht zuverlässig erkannt werden.
-- Die Ganzringwerte der Serien werden aus jeweils zehn vollständig erkannten Einzelschüssen abgeleitet.
-- Zähler werden separat ausgewertet und anhand der Schussanzahl sowie des Ganzring-Gesamtergebnisses plausibilisiert.
-- Foto wird weiterhin automatisch in ein A4-PDF umgewandelt.
-- Duplikatprüfung bleibt für beide Importwege erhalten.
+- Fotoimport: Jede Serie wird anhand ihrer zehn Einzelschüsse geprüft.
+- Die zehn Dezimal-Schusswerte einer Serie werden addiert und mit dem unabhängig erkannten Serienwert verglichen, sofern dieser in der Serienüberschrift lesbar ist.
+- Zusätzlich wird die Ganzring-Summe der zehn Schüsse mit dem erkannten Ganzring-Serienwert verglichen.
+- Wenn die Serienüberschrift nicht zuverlässig erkannt wird, wird die Summe der Einzelschüsse als Serienwert verwendet und ausdrücklich als nicht unabhängig geprüft markiert.
+- Die Summe aller 60 Einzelschüsse wird mit dem Gesamtergebnis in Zehntelringen und ganzen Ringen verglichen.
+- Die Importvorschau zeigt die Prüfergebnisse für jede Serie und das Gesamtergebnis.
+- Fotoimport erkennt oder speichert keine Pfeile.
+- PDF-Import extrahiert weiterhin die Schusspfeile aus dem Original-PDF.
+- Duplikatprüfung bleibt erhalten.
 - Trefferbilder werden nicht gespeichert oder angezeigt.
-- IndexedDB-Datenbank `shootbook-v1` bleibt unverändert.
+- IndexedDB `shootbook-v1` bleibt unverändert.
 
 ## Hinweise
 - OCR und PDF-Erstellung benötigen beim Import eine Internetverbindung.
-- Foto-OCR hängt von Schärfe, Beleuchtung, Perspektive und vollständiger Sichtbarkeit des Dokuments ab.
-- Nicht vollständig erkannte Serien und Zähler müssen in der Importvorschau kontrolliert werden.
-- Der PDF-Pfeilimport nutzt weiterhin die bestehende Extraktion aus dem Original-PDF.
-- Kein praktischer iPhone-Test für diese Version durchgeführt.
+- Die Plausibilitätsprüfung erkennt Abweichungen, garantiert aber nicht, dass jeder OCR-Wert richtig gelesen wurde.
+- Nicht unabhängig erkannte Serienwerte werden in der Vorschau entsprechend gekennzeichnet.
+- Kein praktischer iPhone-Test wurde durchgeführt.
