@@ -19,7 +19,7 @@
 </style></head><body><main><div class="headrow"><h1 id="appTitle">Mein Schießbuch ◎</h1><button class="btn settingsBtn" id="settings" aria-label="Einstellungen">⚙</button></div>
 <div class="actions"><label class="btn primary">＋ Foto importieren<input id="photo" type="file" accept="image/*" capture="environment"></label><label class="btn">PDF importieren<input id="pdf" type="file" accept=".pdf,application/pdf" multiple></label><button class="btn" id="manual">＋ Manuell</button><button class="btn" id="backup">Backup</button><button class="btn" id="csv">CSV-Export</button><label class="btn">Backup laden<input id="restore" type="file" accept=".json"></label></div>
 <div class="tabs"><button class="active" data-tab="competition">Wettkämpfe</button><button data-tab="training">Training</button></div><div id="dash"></div><div class="panel"><h2>Alle Einheiten</h2><div class="sub">Eintrag antippen für Details</div><button class="btn filter-toggle" id="toggleFilters" type="button" aria-expanded="false">Filter anzeigen</button><div class="filters" id="filtersPanel" hidden><div class="field filter-search"><label for="filterText">Suche</label><input id="filterText" type="search" placeholder="Datum, Ergebnis, Teiler …"></div><div class="field"><label for="filterFrom">Von</label><input id="filterFrom" type="date"></div><div class="field"><label for="filterTo">Bis</label><input id="filterTo" type="date"></div><div class="field"><label for="filterDiscipline">Disziplin</label><select id="filterDiscipline"><option value="">Alle Disziplinen</option><option>LG 60 ZR</option><option>LG 40 ZR</option></select></div><button class="btn" id="clearFilters">Filter zurücksetzen</button></div><div id="list"></div></div>
-<footer>Speicherung lokal im Browser. Für eine iCloud-Kopie „Backup“ wählen und die JSON-Datei in iCloud Drive speichern. Keine automatische iCloud-Synchronisierung. PDF-Textauswertung benötigt beim Import eine Internetverbindung.<div style="text-align:center;margin-top:14px;font-weight:700;letter-spacing:1px">Version 1.3.10</div></footer></main>
+<footer>Speicherung lokal im Browser. Für eine iCloud-Kopie „Backup“ wählen und die JSON-Datei in iCloud Drive speichern. Keine automatische iCloud-Synchronisierung. PDF-Textauswertung benötigt beim Import eine Internetverbindung.<div style="text-align:center;margin-top:14px;font-weight:700;letter-spacing:1px">Version 1.3.11</div></footer></main>
 <div class="modal" id="modal"><div class="sheet"><button class="btn" id="close">Schließen</button><div id="body"></div></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script>
 if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -140,11 +140,14 @@ async function ocrPage(page){
 }
 
 
+
 function normalizeShotToken(token){
- const raw=String(token||'').trim().replace(/^[^0-9]+|[^0-9.,].*$/g,'');
- let m=raw.match(/^(10|[0-9])[.,]?([0-9])/);
+ const raw=String(token||'').trim().replace(/^[^0-9]+/,'');
+ // Shot values always have one decimal. OCR may append arrow glyphs or misread an arrow as another digit;
+ // the first decimal digit is the score. Metadata is excluded by the strict two-row geometry filter.
+ const m=raw.match(/^(10|[0-9])(?:[.,]([0-9])|([0-9]))/);
  if(!m)return null;
- const value=Number(m[1]+'.'+m[2]);
+ const value=Number(m[1]+'.'+(m[2]||m[3]));
  return Number.isFinite(value)&&value>=0&&value<=10.9?value.toFixed(1):null;
 }
 function extractShotValues(text){
@@ -180,33 +183,38 @@ function cropArrow(canvas,bbox){
  cc.putImageData(im,0,0);return crop.toDataURL('image/png');
 }
 
+
 function extractPositionedShots(words,region){
  const candidates=(words||[]).map(w=>{
   const value=normalizeShotToken(w.text),b=w.bbox;
   if(value===null||!b)return null;
   const cy=(b.y0+b.y1)/2,cx=(b.x0+b.x1)/2;
-  // The two shot rows sit below the series heading and above the divider/group metadata.
-  if(cy<region.height*.17||cy>region.height*.61)return null;
-  return {value:Number(value),cx,cy,b};
- }).filter(Boolean);
- if(candidates.length<8)return extractShotValues(region.text||'').map(Number);
- // Cluster by vertical position into the two printed rows.
- const sortedY=[...candidates].sort((a,b)=>a.cy-b.cy);
- let split=-1,maxGap=0;
- for(let i=3;i<=sortedY.length-4;i++){
-  const gap=sortedY[i].cy-sortedY[i-1].cy;
+  // The shot values occupy two rows. Exclude the series heading above and all divider/group metadata below.
+  if(cy<region.height*.16||cy>region.height*.47)return null;
+  return {value:Number(value),cx,cy};
+ }).filter(Boolean).sort((a,b)=>a.cy-b.cy||a.cx-b.cx);
+ if(!candidates.length)return [];
+ if(candidates.length<10)return candidates.map(v=>v.value);
+ // Split into the two printed rows at the largest vertical gap around the middle.
+ let split=-1,maxGap=-1;
+ for(let i=3;i<=6;i++){
+  if(i>=candidates.length)continue;
+  const gap=candidates[i].cy-candidates[i-1].cy;
   if(gap>maxGap){maxGap=gap;split=i;}
  }
- if(split<0)return [];
- let row1=sortedY.slice(0,split),row2=sortedY.slice(split);
- // Remove occasional OCR false positives by keeping the five values closest to the row's median baseline.
- const trimRow=row=>{
-  const ys=row.map(v=>v.cy).sort((a,b)=>a-b),median=ys[Math.floor(ys.length/2)];
-  return row.sort((a,b)=>Math.abs(a.cy-median)-Math.abs(b.cy-median)).slice(0,5).sort((a,b)=>a.cx-b.cx);
- };
- row1=trimRow(row1);row2=trimRow(row2);
- if(row1.length!==5||row2.length!==5)return [];
- return [...row1,...row2].map(v=>v.value);
+ if(split<0)return candidates.map(v=>v.value);
+ const rows=[candidates.slice(0,split),candidates.slice(split)];
+ const ordered=[];
+ for(const row of rows){
+  let selected=row;
+  if(selected.length>5){
+   const ys=selected.map(v=>v.cy).sort((a,b)=>a-b),median=ys[Math.floor(ys.length/2)];
+   selected=selected.slice().sort((a,b)=>Math.abs(a.cy-median)-Math.abs(b.cy-median)).slice(0,5);
+  }
+  selected.sort((a,b)=>a.cx-b.cx);
+  ordered.push(...selected.map(v=>v.value));
+ }
+ return ordered;
 }
 async function recognizeCanvas(canvas,psm='6'){
  const worker=await Tesseract.createWorker('deu+eng');
@@ -358,7 +366,7 @@ async function ocrImageCanvas(canvas){
   const values=extractPositionedShots(pass.words,{width:region.width,height:region.height,text:pass.text});
   regionalShots.push(values);
   regionalWhole.push(values.length===10?values.reduce((sum,v)=>sum+Math.floor(Number(v)),0):null);
-  const headingMatch=pass.text.match(/(?:Serie\s*\d+\s*:\s*)?(\d{2,3}[.,]\d)\s*\(\s*(\d{2,3})\s*\)/i);
+  const headingMatch=pass.text.match(new RegExp('^\\s*Serie\\s*'+(i+1)+'\\s*[:.]\\s*(\\d{2,3}[.,]\\d)\\s*\\(\\s*(\\d{2,3})\\s*\\)','im'));
   regionalSeries.push(headingMatch?{decimal:Number(headingMatch[1].replace(',','.')),whole:Number(headingMatch[2])}:null);
   seriesText.push(pass.text);
   // Fotoimport: Pfeile werden bewusst nicht erkannt oder gespeichert.
@@ -366,16 +374,16 @@ async function ocrImageCanvas(canvas){
  // Canonicalize the six headings from the header series row, which is more reliable than OCR in each crop.
  const seriesMatch=header.text.match(/Serien\s*:\s*([^\r\n]+)/i);
  const seriesValues=seriesMatch?(seriesMatch[1].match(/\d{2,3}[.,]\d/g)||[]):[];
+ const expectedSeries=seriesValues.length===6?seriesValues.map(v=>Number(v.replace(',','.'))):regionalSeries.map(v=>v?.decimal??null);
  const canonicalSeries=seriesText.map((txt,i)=>{
   const regional=regionalSeries[i];
-  const headerValue=seriesValues[i]||'';
-  const decimal=regional?String(regional.decimal.toFixed(1)):headerValue;
+  const decimal=expectedSeries[i]!=null?Number(expectedSeries[i]).toFixed(1):(regional?regional.decimal.toFixed(1):'');
   const whole=regional?String(regional.whole):'';
   return `Serie ${i+1}: ${decimal}${whole?` (${whole})`:''}\n${txt.split(/\r?\n/).slice(1).join('\n')}`;
  });
  const resultLine=resultPass.found?`Ergebnis: ${resultPass.found.decimal} (${resultPass.found.whole})`:'';
  const combined=resultLine+'\n'+header.text+'\n'+resultPass.text+'\n'+countPass.text+'\n'+canonicalSeries.join('\n');
- return {text:combined,regionalShots,regionalWhole,regionalSeries,countText:header.text+'\n'+countPass.text,resultOCR:resultPass.text,resultFound:resultPass.found};
+ return {text:combined,regionalShots,regionalWhole,regionalSeries,expectedSeries,countText:header.text+'\n'+countPass.text,resultOCR:resultPass.text,resultFound:resultPass.found};
 }
 
 function recoverCounts(countText,seriesWhole,scoreDetail){
@@ -507,17 +515,19 @@ document.getElementById('photo').onchange=async e=>{
    const shotDerivedSeries=x.shots.map(row=>row.length===10?Number(row.reduce((sum,v)=>sum+Number(v),0).toFixed(1)):null);
    const shotDerivedWhole=x.shots.map(row=>row.length===10?row.reduce((sum,v)=>sum+Math.floor(Number(v)),0):null);
    x.seriesConsistency=x.shots.map((row,i)=>{
-    const heading=scan.regionalSeries?.[i],complete=row.length===10;
+    const expected=scan.expectedSeries?.[i],heading=scan.regionalSeries?.[i],complete=row.length===10;
     if(!complete)return {ok:false,status:'unvollständig',shotCount:row.length};
     const sum=shotDerivedSeries[i],whole=shotDerivedWhole[i];
-    if(heading){
-     const decimalOk=Math.abs(sum-heading.decimal)<0.051,wholeOk=whole===heading.whole;
-     return {ok:decimalOk&&wholeOk,status:decimalOk&&wholeOk?'stimmt':'Abweichung',shotSum:sum,shotWhole:whole,expected:heading.decimal,expectedWhole:heading.whole};
+    const decimalOk=expected!=null&&Math.abs(sum-expected)<0.051;
+    const wholeOk=!heading||whole===heading.whole;
+    if(expected!=null){
+     const ok=decimalOk&&wholeOk;
+     return {ok,status:ok?'stimmt':'Abweichung',shotSum:sum,shotWhole:whole,expected,expectedWhole:heading?.whole??null};
     }
-    return {ok:null,status:'Serienwert nicht unabhängig erkannt',shotSum:sum,shotWhole:whole};
+    return {ok:null,status:'Serienreferenz nicht erkannt',shotSum:sum,shotWhole:whole};
    });
-   // Use the sum of the ten recognized shots as the series value only when all ten are present.
-   x.series=shotDerivedSeries.map((v,i)=>v==null?(scan.regionalSeries?.[i]?.decimal??null):v);
+   // The six values from the document's upper "Serien:" row are authoritative.
+   x.series=(scan.expectedSeries?.length===6?scan.expectedSeries:shotDerivedSeries);
    x.seriesWhole=shotDerivedWhole.map((v,i)=>v==null?(scan.regionalSeries?.[i]?.whole??null):v);
    x.seriesCount=x.series.length;
    const shotTotal=x.shots.every(row=>row.length===10)?Number(x.shots.flat().reduce((sum,v)=>sum+Number(v),0).toFixed(1)):null;

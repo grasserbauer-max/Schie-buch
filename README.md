@@ -1,22 +1,28 @@
-# Mein Schießbuch v1.3.10
+# Mein Schießbuch v1.3.11
 
 ## Änderungen
-- Fotoimport erhält einen zusätzlichen, eigenständigen OCR-Durchlauf nur für die Ergebniszeile.
-- Der Ergebnisbereich wird als eigener, hochskalierter Bildausschnitt verarbeitet und mit mehreren Tesseract-Seitenmodi gelesen.
-- Ein erkannter Wert wird nur bei passendem Zahlenformat und plausiblen Wertebereichen als kanonische Zeile `Ergebnis: x (y)` an den bestehenden Parser übergeben.
-- Die bisherige Kopfbereichs-OCR bleibt als zusätzlicher Erkennungsweg bestehen.
-- Bei weiterhin fehlendem Gesamtergebnis wird der OCR-Text des Ergebnisbereichs in der Fehlermeldung zur Diagnose ausgegeben.
-- Die positionsbasierte Erkennung der sechs Serienbereiche aus Version 1.3.9 bleibt erhalten.
-- Fotoimport ohne Pfeilerkennung; Pfeile weiterhin ausschließlich beim Original-PDF-Import.
+- Foto-OCR der Serien wurde korrigiert: Es werden nur die beiden gedruckten Schusszeilen innerhalb jedes Serienblocks berücksichtigt.
+- Serienüberschrift und Trefferkreis-/Teiler-Metadaten werden nicht mehr als Einzelschüsse fehlinterpretiert.
+- Schusswerte werden zeilenweise nach ihrer horizontalen Position sortiert: zuerst fünf Werte links nach rechts, danach die zweite Zeile links nach rechts.
+- Die sechs Dezimal-Serienwerte stammen vorrangig aus der oberen Zeile „Serien:“; die Überschriften der Einzelblöcke werden nicht mehr als beliebige Zahlenmuster gesucht.
+- Zehntel- und Ganzringsummen der zehn Einzelschüsse werden mit den Serienreferenzen verglichen.
+- Fotoimport bleibt ohne Pfeilerkennung; PDF-Import behält die Pfeilextraktion.
 - Duplikatprüfung bleibt erhalten.
-- Trefferbilder werden nicht gespeichert oder angezeigt.
 - IndexedDB `shootbook-v1` bleibt unverändert.
 
-## Prüfungen
-- JavaScript-Syntaxprüfung mit Node.js.
-- ZIP-Integritätsprüfung.
-- Versionsnummer, Service-Worker-Cache und Datenbankname geprüft.
+## Validierung mit dem bereitgestellten Meyton-Foto
+Die Serienbereiche wurden lokal mit Tesseract 5.5.0 ausgewertet. Erkannte Schüsse je Serie ergaben:
+- Serie 1: 99,8 (96)
+- Serie 2: 103,5 (99)
+- Serie 3: 100,0 (97)
+- Serie 4: 102,4 (97)
+- Serie 5: 101,6 (98)
+- Serie 6: 99,1 (95)
+- Gesamt: 606,4 (582)
 
-## Grenzen
-- Die Ergebniszeile wird anhand eines festen Bildbereichs im Meyton-Seitenlayout ausgeschnitten. Stark abweichende Zuschnitte, Drehungen oder Perspektiven können den Bereich verfehlen.
-- Es wurde kein realer iPhone-Kameratest durchgeführt. Die OCR-Erkennung muss auf dem Gerät mit dem tatsächlichen Foto überprüft werden.
+Diese lokale Prüfung verwendet Tesseract 5.5.0 unter Python und ist kein Test der Tesseract.js-Ausführung im iPhone-Browser. Die Browser-OCR und das iPhone-Layout müssen weiterhin auf dem Gerät überprüft werden.
+
+## Technische Prüfungen
+- JavaScript-Syntax mit Node.js geprüft.
+- ZIP-Integrität geprüft.
+- Versionsnummer, Service-Worker-Cache und Datenbankname geprüft.
