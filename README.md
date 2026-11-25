@@ -1,10 +1,10 @@
-# Schießbuch – Version 1.2.7
+# Schießbuch – Version 1.2.8
 
-Änderungen gegenüber 1.2.6:
-- Backup-Erinnerung vollständig entfernt. Manuelle Backup-Erstellung und Backup laden bleiben erhalten.
-- Suche verbessert: zusätzliches Textsuchfeld für Datum, Ergebnis, ganze Ringe, Disziplin, Innenzehner und Teiler.
-- Datums- und Disziplinfilter bleiben verfügbar und können kombiniert werden.
-- Filterlayout für iPhone überarbeitet: Eingabefelder passen in die verfügbare Breite, auf schmalen Displays untereinander, keine überlappenden Datumsfelder.
-- Diagrammlinien und Messpunkte verwenden nun ausdrücklich dieselbe CSS-Akzentfarbe wie die übrigen Akzente der App.
+Änderungen gegenüber 1.2.7:
+- Filterbereich ist standardmäßig eingeklappt und kann über „Filter anzeigen“ bei Bedarf geöffnet werden.
+- Beim Öffnen werden Suche, Datumsfilter und Disziplinfilter angezeigt; „Filter ausblenden“ klappt sie wieder ein.
+- Der Umschalter zeigt an, wie viele Filter aktiv sind.
+- iPhone-Datumsfelder verwenden nun explizite Breitenbegrenzung, min-inline-size: 0, border-box und native-appearance-Anpassungen, damit sie nicht mehr aus dem Panel herausragen.
+- Filter zurücksetzen bleibt erhalten.
+- Datenbank und gespeicherte Ergebnisse bleiben unverändert.
 - QR-Code-Import weiterhin nicht enthalten.
-- Bestehende IndexedDB `shootbook-v1` bleibt erhalten; vorhandene Ergebnisse und Einstellungen werden nicht migriert oder gelöscht.
