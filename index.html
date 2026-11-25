@@ -19,7 +19,7 @@
 </style></head><body><main><div class="headrow"><h1 id="appTitle">Mein Schießbuch ◎</h1><button class="btn settingsBtn" id="settings" aria-label="Einstellungen">⚙</button></div>
 <div class="actions"><label class="btn primary">＋ Foto importieren<input id="photo" type="file" accept="image/*" capture="environment"></label><label class="btn">PDF importieren<input id="pdf" type="file" accept=".pdf,application/pdf" multiple></label><button class="btn" id="manual">＋ Manuell</button><button class="btn" id="backup">Backup</button><button class="btn" id="csv">CSV-Export</button><label class="btn">Backup laden<input id="restore" type="file" accept=".json"></label></div>
 <div class="tabs"><button class="active" data-tab="competition">Wettkämpfe</button><button data-tab="training">Training</button></div><div id="dash"></div><div class="panel"><h2>Alle Einheiten</h2><div class="sub">Eintrag antippen für Details</div><button class="btn filter-toggle" id="toggleFilters" type="button" aria-expanded="false">Filter anzeigen</button><div class="filters" id="filtersPanel" hidden><div class="field filter-search"><label for="filterText">Suche</label><input id="filterText" type="search" placeholder="Datum, Ergebnis, Teiler …"></div><div class="field"><label for="filterFrom">Von</label><input id="filterFrom" type="date"></div><div class="field"><label for="filterTo">Bis</label><input id="filterTo" type="date"></div><div class="field"><label for="filterDiscipline">Disziplin</label><select id="filterDiscipline"><option value="">Alle Disziplinen</option><option>LG 60 ZR</option><option>LG 40 ZR</option></select></div><button class="btn" id="clearFilters">Filter zurücksetzen</button></div><div id="list"></div></div>
-<footer>Speicherung lokal im Browser. Für eine iCloud-Kopie „Backup“ wählen und die JSON-Datei in iCloud Drive speichern. Keine automatische iCloud-Synchronisierung. PDF-Textauswertung benötigt beim Import eine Internetverbindung.<div style="text-align:center;margin-top:14px;font-weight:700;letter-spacing:1px">Version 1.3.9</div></footer></main>
+<footer>Speicherung lokal im Browser. Für eine iCloud-Kopie „Backup“ wählen und die JSON-Datei in iCloud Drive speichern. Keine automatische iCloud-Synchronisierung. PDF-Textauswertung benötigt beim Import eine Internetverbindung.<div style="text-align:center;margin-top:14px;font-weight:700;letter-spacing:1px">Version 1.3.10</div></footer></main>
 <div class="modal" id="modal"><div class="sheet"><button class="btn" id="close">Schließen</button><div id="body"></div></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script>
 if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -291,6 +291,49 @@ async function recognizeCanvas(canvas,psm='6'){
   return {text:result.data?.text||'',words:result.data?.words||[]};
  }finally{await worker.terminate()}
 }
+
+function parseResultCandidate(text){
+ const normalized=String(text||'').replace(/[|Il]/g,'1').replace(/[oO]/g,'0').replace(/,/g,'.');
+ const patterns=[
+  /(?:Ergebnis|Ergebn[i1l]s)\s*[:.]?\s*(\d{3}[.,]\d)\s*[\[(]?\s*(\d{3})\s*[\])]?/i,
+  /\b(6\d{2}[.,]\d)\s*[\[(]\s*(\d{3})\s*[\])]/,
+  /\b(6\d{2}[.,]\d)\s+(\d{3})\b/
+ ];
+ for(const re of patterns){
+  const m=String(text||'').match(re);
+  if(!m)continue;
+  const decimal=Number(m[1].replace(',','.')),whole=Number(m[2]);
+  if(decimal>=500&&decimal<=700&&whole>=450&&whole<=650&&Math.abs(decimal-whole)<=60){
+   return {decimal:decimal.toFixed(1),whole};
+  }
+ }
+ return null;
+}
+async function recognizeResultRow(canvas){
+ const W=canvas.width,H=canvas.height;
+ // Meyton sheet: result line is directly below the horizontal header separator, left of the target.
+ const x=Math.round(W*.12),y=Math.round(H*.125),w=Math.round(W*.48),h=Math.round(H*.075);
+ const crop=document.createElement('canvas');crop.width=w*5;crop.height=h*5;
+ const ctx=crop.getContext('2d',{willReadFrequently:true});
+ ctx.drawImage(canvas,x,y,w,h,0,0,crop.width,crop.height);
+ // Increase local contrast without changing the original source image.
+ const image=ctx.getImageData(0,0,crop.width,crop.height),d=image.data;
+ for(let i=0;i<d.length;i+=4){
+  const gray=(d[i]*.299+d[i+1]*.587+d[i+2]*.114);
+  const v=gray<205?0:255;
+  d[i]=d[i+1]=d[i+2]=v;
+ }
+ ctx.putImageData(image,0,0);
+ const passes=[];
+ for(const psm of ['7','6','11']){
+  try{passes.push(await recognizeCanvas(crop,psm));}catch(e){}
+ }
+ for(const pass of passes){
+  const found=parseResultCandidate(pass.text);
+  if(found)return {found,text:passes.map(v=>v.text).join('\\n')};
+ }
+ return {found:null,text:passes.map(v=>v.text).join('\\n')};
+}
 async function ocrImageCanvas(canvas){
  if(!window.Tesseract)await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
  const W=canvas.width,H=canvas.height;
@@ -299,6 +342,7 @@ async function ocrImageCanvas(canvas){
  const headerCanvas=document.createElement('canvas');headerCanvas.width=hw*2;headerCanvas.height=hh*2;
  headerCanvas.getContext('2d',{willReadFrequently:true}).drawImage(canvas,hx,hy,hw,hh,0,0,headerCanvas.width,headerCanvas.height);
  const header=await recognizeCanvas(headerCanvas,'6');
+ const resultPass=await recognizeResultRow(canvas);
  // A second OCR pass reads the compact count row at higher scale.
  const cx=Math.round(W*.12),cy=Math.round(H*.145),cw=Math.round(W*.55),ch=Math.round(H*.075);
  const countCanvas=document.createElement('canvas');countCanvas.width=cw*3;countCanvas.height=ch*3;
@@ -329,8 +373,9 @@ async function ocrImageCanvas(canvas){
   const whole=regional?String(regional.whole):'';
   return `Serie ${i+1}: ${decimal}${whole?` (${whole})`:''}\n${txt.split(/\r?\n/).slice(1).join('\n')}`;
  });
- const combined=header.text+'\n'+countPass.text+'\n'+canonicalSeries.join('\n');
- return {text:combined,regionalShots,regionalWhole,regionalSeries,countText:header.text+'\n'+countPass.text};
+ const resultLine=resultPass.found?`Ergebnis: ${resultPass.found.decimal} (${resultPass.found.whole})`:'';
+ const combined=resultLine+'\n'+header.text+'\n'+resultPass.text+'\n'+countPass.text+'\n'+canonicalSeries.join('\n');
+ return {text:combined,regionalShots,regionalWhole,regionalSeries,countText:header.text+'\n'+countPass.text,resultOCR:resultPass.text,resultFound:resultPass.found};
 }
 
 function recoverCounts(countText,seriesWhole,scoreDetail){
@@ -450,7 +495,12 @@ document.getElementById('photo').onchange=async e=>{
   const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();
   const pdfBlob=await photoToPdf(canvas),scan=await ocrImageCanvas(canvas);
   const pseudoFile={name:(f.name||'Foto').replace(/\.[^.]+$/,'')+'.pdf'};
-  const x=parse(scan.text,pseudoFile,[]);
+  let x;
+  try{x=parse(scan.text,pseudoFile,[]);}
+  catch(err){
+   if(!scan.resultFound)throw new Error((err?.message||'Gesamtergebnis nicht erkannt')+'\nErgebnis-OCR: '+(scan.resultOCR||'keine Texterkennung'));
+   throw err;
+  }
   if(Array.isArray(scan.regionalShots)&&scan.regionalShots.length===6){
    x.shots=scan.regionalShots.map(a=>a.map(v=>Number(v)));
    x.shotArrows=x.shots.map(row=>row.map(()=>null));

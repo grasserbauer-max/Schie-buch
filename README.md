@@ -1,19 +1,22 @@
-# Mein Schießbuch v1.3.9
+# Mein Schießbuch v1.3.10
 
 ## Änderungen
-- Fotoimport verarbeitet die sechs Serienbereiche getrennt.
-- Die zehn Schusswerte je Serie werden anhand ihrer OCR-Bildkoordinaten erkannt und geometrisch in zwei Zeilen gruppiert.
-- Innerhalb jeder Zeile gilt die feste Reihenfolge von links nach rechts: Schüsse 1–5, danach Schüsse 6–10.
-- Die Serienüberschrift wird separat aus dem jeweiligen Serienbereich gelesen.
-- Die obere Kopfzeile mit den sechs Serienwerten wird nicht als zweite Quelle für zusätzliche Serien verwendet.
-- Die Summe der zehn Schüsse wird mit dem separat erkannten Serienwert in Zehntelringen und ganzen Ringen verglichen.
-- Abweichungen und unvollständige Reihen werden in der Vorschau markiert.
-- Fotoimport bleibt ohne Pfeilerkennung. PDF-Import extrahiert weiterhin Pfeile aus dem Original-PDF.
-- Trefferbilder werden nicht gespeichert oder angezeigt.
+- Fotoimport erhält einen zusätzlichen, eigenständigen OCR-Durchlauf nur für die Ergebniszeile.
+- Der Ergebnisbereich wird als eigener, hochskalierter Bildausschnitt verarbeitet und mit mehreren Tesseract-Seitenmodi gelesen.
+- Ein erkannter Wert wird nur bei passendem Zahlenformat und plausiblen Wertebereichen als kanonische Zeile `Ergebnis: x (y)` an den bestehenden Parser übergeben.
+- Die bisherige Kopfbereichs-OCR bleibt als zusätzlicher Erkennungsweg bestehen.
+- Bei weiterhin fehlendem Gesamtergebnis wird der OCR-Text des Ergebnisbereichs in der Fehlermeldung zur Diagnose ausgegeben.
+- Die positionsbasierte Erkennung der sechs Serienbereiche aus Version 1.3.9 bleibt erhalten.
+- Fotoimport ohne Pfeilerkennung; Pfeile weiterhin ausschließlich beim Original-PDF-Import.
 - Duplikatprüfung bleibt erhalten.
-- IndexedDB-Datenbank `shootbook-v1` bleibt unverändert.
+- Trefferbilder werden nicht gespeichert oder angezeigt.
+- IndexedDB `shootbook-v1` bleibt unverändert.
 
-## Hinweise
-- OCR und PDF-Erstellung benötigen beim Fotoimport eine Internetverbindung.
-- Die Erkennung basiert auf dem Meyton-LG-60-ZR-Seitenlayout und den Bildkoordinaten. Perspektive, Drehung, Zuschnitt, Licht und Unschärfe können die Positionszuordnung beeinflussen.
-- Ein iPhone-Feldtest wurde nicht durchgeführt. Die tatsächliche Erkennung muss auf dem Gerät mit einem scharfen, vollständig sichtbaren Foto geprüft werden.
+## Prüfungen
+- JavaScript-Syntaxprüfung mit Node.js.
+- ZIP-Integritätsprüfung.
+- Versionsnummer, Service-Worker-Cache und Datenbankname geprüft.
+
+## Grenzen
+- Die Ergebniszeile wird anhand eines festen Bildbereichs im Meyton-Seitenlayout ausgeschnitten. Stark abweichende Zuschnitte, Drehungen oder Perspektiven können den Bereich verfehlen.
+- Es wurde kein realer iPhone-Kameratest durchgeführt. Die OCR-Erkennung muss auf dem Gerät mit dem tatsächlichen Foto überprüft werden.
