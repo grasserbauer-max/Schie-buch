@@ -1,16 +1,15 @@
-# Mein Schießbuch v1.3.13
+# Mein Schießbuch v1.3.14
 
 ## Änderungen
-- Fotoimport erstellt zuerst ein PDF aus dem ausgewählten Foto.
-- Das erzeugte PDF wird anschließend durch denselben PDF-Extraktions- und Analysepfad wie ein normaler PDF-Import verarbeitet.
-- Die direkte, separate Foto-OCR und deren abweichende Serien-Sonderlogik werden im Fotoimport nicht mehr verwendet.
-- PDF-Bild wird als PNG eingebettet, um zusätzliche JPEG-Kompressionsverluste zu vermeiden.
-- Duplikatprüfung bleibt aktiv; bei erneutem Import wird vor dem Speichern gewarnt.
-- Originale Schusspfeile werden weiterhin nur aus normalen Meyton-PDFs übernommen.
-- Datenbank `shootbook-v1` bleibt unverändert.
-- Versionsanzeige und Service-Worker-Cache auf 1.3.13 aktualisiert.
+- Fotoimport vollständig entfernt: kein Foto-Button, kein Foto-Importhandler und keine Foto-zu-PDF-Konvertierung mehr.
+- PDF importieren ist die einzige Importmöglichkeit und bleibt links als primärer Importbutton.
+- PDF-Import erkennt weiterhin PDFs mit Textebene und gescannte Bild-PDFs ohne Textebene.
+- OCR für Bild-PDFs überarbeitet: adaptive Renderauflösung mit begrenzter maximaler Bildkante, um Speicherprobleme auf dem iPhone zu reduzieren.
+- OCR-Bildvorverarbeitung verbessert den Kontrast von grauem Papier, ohne kleine Dezimalpunkte durch harte Binarisierung zu entfernen.
+- Zweiter OCR-Durchlauf mit alternativer Seitensegmentierung, wenn die erste Erkennung zu wenig Text liefert.
+- Bestehender PDF-Parser, Duplikatprüfung und Pfeilextraktion bleiben erhalten.
+- IndexedDB `shootbook-v1` bleibt unverändert.
+- Versionsanzeige und Service-Worker-Cache auf 1.3.14 aktualisiert.
 
-## Einschränkungen
-- Ein Foto-PDF enthält weiterhin nur Bilddaten. Die Werte werden daher über die OCR des normalen PDF-Imports erkannt.
-- Die Bildqualität kann nicht besser werden als das Ausgangsfoto. Unschärfe, Reflexionen, Perspektivfehler oder abgeschnittene Ränder lassen sich durch die PDF-Konvertierung nicht vollständig beheben.
-- Die Änderung wurde syntaktisch geprüft; ein vollständiger iPhone-Test mit realen Fotos wurde nicht durchgeführt.
+## Hinweis zum iPhone-Scan
+Das bereitgestellte iPhone-PDF ist ein Bild-PDF ohne Textschicht. Es wird daher über PDF.js gerendert und lokal mit Tesseract.js OCR verarbeitet. Die neue OCR-Verarbeitung wurde syntaktisch geprüft, aber noch nicht auf einem echten iPhone ausgeführt. Die Erkennungsqualität muss nach dem Upload mit dem bereitgestellten Scan kontrolliert werden.
