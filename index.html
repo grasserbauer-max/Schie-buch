@@ -19,7 +19,7 @@
 </style></head><body><main><div class="headrow"><h1 id="appTitle">Mein Schießbuch ◎</h1><button class="btn settingsBtn" id="settings" aria-label="Einstellungen">⚙</button></div>
 <div class="actions"><label class="btn primary">＋ Foto importieren<input id="photo" type="file" accept="image/*" capture="environment"></label><label class="btn">PDF importieren<input id="pdf" type="file" accept=".pdf,application/pdf" multiple></label><button class="btn" id="manual">＋ Manuell</button><button class="btn" id="backup">Backup</button><button class="btn" id="csv">CSV-Export</button><label class="btn">Backup laden<input id="restore" type="file" accept=".json"></label></div>
 <div class="tabs"><button class="active" data-tab="competition">Wettkämpfe</button><button data-tab="training">Training</button></div><div id="dash"></div><div class="panel"><h2>Alle Einheiten</h2><div class="sub">Eintrag antippen für Details</div><button class="btn filter-toggle" id="toggleFilters" type="button" aria-expanded="false">Filter anzeigen</button><div class="filters" id="filtersPanel" hidden><div class="field filter-search"><label for="filterText">Suche</label><input id="filterText" type="search" placeholder="Datum, Ergebnis, Teiler …"></div><div class="field"><label for="filterFrom">Von</label><input id="filterFrom" type="date"></div><div class="field"><label for="filterTo">Bis</label><input id="filterTo" type="date"></div><div class="field"><label for="filterDiscipline">Disziplin</label><select id="filterDiscipline"><option value="">Alle Disziplinen</option><option>LG 60 ZR</option><option>LG 40 ZR</option></select></div><button class="btn" id="clearFilters">Filter zurücksetzen</button></div><div id="list"></div></div>
-<footer>Speicherung lokal im Browser. Für eine iCloud-Kopie „Backup“ wählen und die JSON-Datei in iCloud Drive speichern. Keine automatische iCloud-Synchronisierung. PDF-Textauswertung benötigt beim Import eine Internetverbindung.<div style="text-align:center;margin-top:14px;font-weight:700;letter-spacing:1px">Version 1.3.6</div></footer></main>
+<footer>Speicherung lokal im Browser. Für eine iCloud-Kopie „Backup“ wählen und die JSON-Datei in iCloud Drive speichern. Keine automatische iCloud-Synchronisierung. PDF-Textauswertung benötigt beim Import eine Internetverbindung.<div style="text-align:center;margin-top:14px;font-weight:700;letter-spacing:1px">Version 1.3.7</div></footer></main>
 <div class="modal" id="modal"><div class="sheet"><button class="btn" id="close">Schließen</button><div id="body"></div></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script>
 if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -246,7 +246,7 @@ async function ocrImageCanvas(canvas){
  const countCanvas=document.createElement('canvas');countCanvas.width=cw*3;countCanvas.height=ch*3;
  countCanvas.getContext('2d').drawImage(canvas,cx,cy,cw,ch,0,0,countCanvas.width,countCanvas.height);
  const countPass=await recognizeCanvas(countCanvas,'7');
- const regionalShots=[],regionalArrows=[],seriesText=[];
+ const regionalShots=[],regionalWhole=[],seriesText=[];
  for(let i=0;i<6;i++){
   const y0=Math.round(H*(.285+i*.103)),y1=Math.min(H,Math.round(H*(.39+i*.103)));
   const x0=Math.round(W*.28),x1=Math.round(W*.96);
@@ -254,13 +254,9 @@ async function ocrImageCanvas(canvas){
   region.getContext('2d',{willReadFrequently:true}).drawImage(canvas,x0,y0,x1-x0,y1-y0,0,0,region.width,region.height);
   const pass=await recognizeCanvas(region,'6');
   const values=extractShotValues(pass.text);regionalShots.push(values);
+  regionalWhole.push(values.length===10?values.reduce((sum,v)=>sum+Math.floor(Number(v)),0):null);
   seriesText.push(pass.text);
-  const candidates=(pass.words||[]).filter(w=>{
-   return normalizeShotToken(w.text)!==null&&w.bbox&&w.bbox.y0>region.height*.18&&w.bbox.y0<region.height*.58;
-  }).sort((a,b)=>a.bbox.y0-b.bbox.y0||a.bbox.x0-b.bbox.x0).slice(0,10);
-  const arrows=candidates.map(w=>cropArrow(region,w.bbox));
-  while(arrows.length<10)arrows.push(null);
-  regionalArrows.push(arrows.slice(0,10));
+  // Fotoimport: Pfeile werden bewusst nicht erkannt oder gespeichert.
  }
  // Canonicalize the six headings from the header series row, which is more reliable than OCR in each crop.
  const seriesMatch=header.text.match(/Serien\s*:\s*([^\r\n]+)/i);
@@ -271,27 +267,32 @@ async function ocrImageCanvas(canvas){
   return `Serie ${i+1}: ${val} (${''})\n${first}`;
  });
  const combined=header.text+'\n'+countPass.text+'\n'+canonicalSeries.join('\n');
- return {text:combined,arrows:regionalArrows.flat(),regionalShots,regionalArrows,countText:header.text+'\n'+countPass.text};
+ return {text:combined,regionalShots,regionalWhole,countText:header.text+'\n'+countPass.text};
 }
-function recoverCounts(countText,seriesWhole){
+
+function recoverCounts(countText,seriesWhole,scoreDetail){
  const lines=String(countText||'').split(/\r?\n/);
- let line=lines.find(v=>/z[aäa]hler/i.test(v))||'';
- if(!line)line=lines.find(v=>/[0-9]{8,}/.test(v))||'';
- const digits=(line.match(/[0-9]{8,}/g)||[]).sort((a,b)=>b.length-a.length)[0];
- if(!digits)return [];
+ const labelIndex=lines.findIndex(v=>/z[aäa]hler/i.test(v));
+ if(labelIndex<0)return [];
+ const line=lines[labelIndex].split(/:/).slice(1).join(':')+' '+(lines[labelIndex+1]||'');
+ let values=(line.match(/\d{1,2}/g)||[]).map(Number);
  const totalShots=seriesWhole?.length?seriesWhole.length*10:60;
- const wholeScore=seriesWhole?.length?seriesWhole.reduce((a,b)=>a+Number(b||0),0):null;
- if(wholeScore==null)return [];
+ const wholeScore=scoreDetail!=null&&scoreDetail!==''?Number(scoreDetail):(seriesWhole?.length?seriesWhole.reduce((a,b)=>a+Number(b||0),0):null);
+ const valid=a=>a.length===11&&a.every(v=>Number.isInteger(v)&&v>=0&&v<=60)&&a.reduce((x,y)=>x+y,0)===totalShots&&wholeScore!=null&&a.reduce((sum,v,i)=>sum+v*(10-i),0)===wholeScore;
+ if(valid(values))return values;
+ const digits=line.replace(/\D/g,'');
+ if(digits.length<11||wholeScore==null)return [];
  const solutions=[];
- const walk=(pos,values,sum,weighted)=>{
-  const idx=values.length;
-  if(idx===11){if(pos===digits.length&&sum===totalShots&&weighted===wholeScore)solutions.push(values);return}
-  const remaining=10-idx;
+ const walk=(pos,a,total,weighted)=>{
+  if(a.length===11){if(pos===digits.length&&total===totalShots&&weighted===wholeScore)solutions.push(a);return}
+  const idx=a.length,remaining=10-idx;
   for(const len of [1,2]){
    if(pos+len>digits.length||digits.length-(pos+len)<remaining)continue;
-   const token=digits.slice(pos,pos+len);if(len===2&&token[0]==='0')continue;
-   const value=Number(token);if(value>60||sum+value>totalShots||weighted+value*(10-idx)>wholeScore)continue;
-   walk(pos+len,[...values,value],sum+value,weighted+value*(10-idx));
+   const token=digits.slice(pos,pos+len);
+   if(len===2&&token[0]==='0')continue;
+   const v=Number(token);
+   if(v>60||total+v>totalShots||weighted+v*(10-idx)>wholeScore)continue;
+   walk(pos+len,[...a,v],total+v,weighted+v*(10-idx));
   }
  };
  walk(0,[],0,0);
@@ -341,6 +342,11 @@ if(!rm)throw Error('Kein gültiges Gesamtergebnis erkannt. OCR-Text konnte nicht
 let seriesRows=[...t.matchAll(/Serie\s*(\d+)\s*:\s*(\d+[.,]\d+)\s*\(\s*(\d+)\s*\)/gi)];
 let series=seriesRows.map(m=>Number(m[2].replace(',','.')));
 let seriesWhole=seriesRows.map(m=>Number(m[3]));
+if(series.length===0){
+ const headerSeries=(t.match(/Serien\s*:\s*((?:\d{2,3}[.,]\d\s*){4,6})/i)||[])[1]||'';
+ series=(headerSeries.match(/\d{2,3}[.,]\d/g)||[]).map(v=>Number(v.replace(',','.')));
+ seriesWhole=[];
+}
 let countText=field('Zähler|Zahler','Innenzehner|Weiteste');let counts=nums(countText).map(v=>Number(v.replace(',','.'))).filter(Number.isInteger);if(counts.length!==11)counts=[];
 let tens=Number(field('Innenzehner','Weiteste|beste Teiler|Trefferkreis|Trefferlage').match(/\d+/)?.[0]||0);
 let farthest=nums(field('Weiteste','beste Teiler|Trefferkreis|Trefferlage')).map(v=>v.trim());
@@ -381,16 +387,17 @@ document.getElementById('photo').onchange=async e=>{
   const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();
   const pdfBlob=await photoToPdf(canvas),scan=await ocrImageCanvas(canvas);
   const pseudoFile={name:(f.name||'Foto').replace(/\.[^.]+$/,'')+'.pdf'};
-  const x=parse(scan.text,pseudoFile,scan.arrows);
+  const x=parse(scan.text,pseudoFile,[]);
   if(Array.isArray(scan.regionalShots)&&scan.regionalShots.length===6){
    x.shots=scan.regionalShots.map(a=>a.map(v=>Number(v)));
-   x.shotArrows=scan.regionalArrows;
+   x.shotArrows=x.shots.map(row=>row.map(()=>null));
+   if(scan.regionalWhole?.length===6&&scan.regionalWhole.every(v=>Number.isInteger(v)))x.seriesWhole=scan.regionalWhole;
   }
-  const recoveredCounts=recoverCounts(scan.countText,x.seriesWhole);
+  const recoveredCounts=recoverCounts(scan.countText,x.seriesWhole,x.scoreDetail);
   if(recoveredCounts.length===11)x.counts=recoveredCounts;
   x.fileHash=await sha256(f);x.sourceType='Foto-OCR';x.scanPdf=true;
   const dupe=duplicateOf(x),shotsOk=(x.shots||[]).length===x.series.length&&(x.shots||[]).every(a=>a.length===10),countsOk=(x.counts||[]).length===11;
-  modal(`<h2>Foto-Import kontrollieren</h2><p class="sub">${f.name} · Foto erkannt · PDF automatisch erstellt</p><div class="field"><label>Kategorie</label><select id="kind"><option value="competition" ${x.kind==='competition'?'selected':''}>Wettkampf</option><option value="training" ${x.kind==='training'?'selected':''}>Training</option></select></div><p>Schütze: <b>${x.shooter||'Nicht erkannt'}</b> · StartNr.: <b>${x.startNo||'—'}</b> · StandNr.: <b>${x.standNo||'—'}</b></p><p>Verein: <b>${x.club||'Nicht erkannt'}</b></p><p>Disziplin: <b>${x.discipline}</b> · Datum: <b>${date(x.date)}</b></p><p>Ergebnis: <b>${fmt(x.score)} (${x.scoreDetail||'Ganzringe nicht erkannt'})</b></p><p>Serien: ${(x.series||[]).map((v,i)=>fmt(v)+' ('+(x.seriesWhole?.[i]??'—')+')').join(' · ')||'Nicht erkannt'}</p><p>Innenzehner: ${x.tens}</p><p>Zähler 10er bis 0er: ${(x.counts||[]).join(' · ')||'Nicht erkannt'} ${countsOk?'':'⚠ unvollständig'}</p><p>Einzelschüsse je Serie: ${(x.shots||[]).map(a=>a.length).join(' / ')||'Nicht erkannt'} ${shotsOk?'':'⚠ nicht alle zehn erkannt'}</p><p>Weiteste: ${(x.farthest||[]).join(' · ')||'Nicht erkannt'}</p><p>Beste Teiler: ${(x.dividers||[]).join(' · ')||'Nicht erkannt'}</p><p>Trefferkreis: ${x.group!=null?fmt(x.group)+' mm':'Nicht erkannt'} · Trefferlage: ${x.position||'Nicht erkannt'}</p><p>Schusspfeile: ${(x.shotArrows||[]).flat().filter(Boolean).length} Bildausschnitte erkannt. Nicht sicher erkennbare Pfeile bleiben leer.</p>${dupe?'<p style="color:#ffbd70;font-weight:700">Mögliches Duplikat: Dieses Ergebnis ist bereits gespeichert.</p>':''}<p class="sub">Das Foto wurde in ein PDF umgewandelt. Bitte Werte kontrollieren, bevor du speicherst.</p><button class="btn" id="saveScanPdf">Erstelltes PDF speichern</button> <button class="btn primary" id="confirm">${dupe?'Trotzdem importieren':'Ergebnis speichern'}</button>`);
+  modal(`<h2>Foto-Import kontrollieren</h2><p class="sub">${f.name} · Foto erkannt · PDF automatisch erstellt</p><div class="field"><label>Kategorie</label><select id="kind"><option value="competition" ${x.kind==='competition'?'selected':''}>Wettkampf</option><option value="training" ${x.kind==='training'?'selected':''}>Training</option></select></div><p>Schütze: <b>${x.shooter||'Nicht erkannt'}</b> · StartNr.: <b>${x.startNo||'—'}</b> · StandNr.: <b>${x.standNo||'—'}</b></p><p>Verein: <b>${x.club||'Nicht erkannt'}</b></p><p>Disziplin: <b>${x.discipline}</b> · Datum: <b>${date(x.date)}</b></p><p>Ergebnis: <b>${fmt(x.score)} (${x.scoreDetail||'Ganzringe nicht erkannt'})</b></p><p>Serien: ${(x.series||[]).map((v,i)=>fmt(v)+' ('+(x.seriesWhole?.[i]??'—')+')').join(' · ')||'Nicht erkannt'}</p><p>Innenzehner: ${x.tens}</p><p>Zähler 10er bis 0er: ${(x.counts||[]).join(' · ')||'Nicht erkannt'} ${countsOk?'':'⚠ unvollständig'}</p><p>Einzelschüsse je Serie: ${(x.shots||[]).map(a=>a.length).join(' / ')||'Nicht erkannt'} ${shotsOk?'':'⚠ nicht alle zehn erkannt'}</p><p>Weiteste: ${(x.farthest||[]).join(' · ')||'Nicht erkannt'}</p><p>Beste Teiler: ${(x.dividers||[]).join(' · ')||'Nicht erkannt'}</p><p>Trefferkreis: ${x.group!=null?fmt(x.group)+' mm':'Nicht erkannt'} · Trefferlage: ${x.position||'Nicht erkannt'}</p>${dupe?'<p style="color:#ffbd70;font-weight:700">Mögliches Duplikat: Dieses Ergebnis ist bereits gespeichert.</p>':''}<p class="sub">Das Foto wurde in ein PDF umgewandelt. Bitte Werte kontrollieren, bevor du speicherst.</p><button class="btn" id="saveScanPdf">Erstelltes PDF speichern</button> <button class="btn primary" id="confirm">${dupe?'Trotzdem importieren':'Ergebnis speichern'}</button>`);
   document.getElementById('saveScanPdf').onclick=()=>downloadBlob(pdfBlob,pseudoFile.name);
   await new Promise(resolve=>document.getElementById('confirm').onclick=async()=>{
    x.kind=document.getElementById('kind').value;
