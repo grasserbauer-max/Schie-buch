@@ -17,9 +17,9 @@
 .field{min-width:0}
 .field input,.field select{box-sizing:border-box;min-width:0;max-width:100%}.chartTip{font-size:12px;color:var(--muted);margin-top:8px;min-height:18px}.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:5px}.field input,.field select{width:100%;padding:11px;border-radius:9px;background:var(--p2);color:white;border:1px solid var(--line)}.series{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.series div{background:var(--p2);padding:10px;border-radius:9px}.series b{display:block;margin-top:4px}footer{font-size:11px;line-height:1.5;color:var(--muted);margin-top:24px}
 </style></head><body><main><div class="headrow"><h1 id="appTitle">Mein Schießbuch ◎</h1><button class="btn settingsBtn" id="settings" aria-label="Einstellungen">⚙</button></div>
-<div class="actions"><label class="btn primary">＋ PDF importieren<input id="pdf" type="file" accept=".pdf,application/pdf" multiple></label><button class="btn" id="manual">＋ Manuell</button><button class="btn" id="backup">Backup</button><button class="btn" id="csv">CSV-Export</button><label class="btn">Backup laden<input id="restore" type="file" accept=".json"></label></div>
+<div class="actions"><label class="btn primary">＋ Foto importieren<input id="photo" type="file" accept="image/*" capture="environment"></label><label class="btn">PDF importieren<input id="pdf" type="file" accept=".pdf,application/pdf" multiple></label><button class="btn" id="manual">＋ Manuell</button><button class="btn" id="backup">Backup</button><button class="btn" id="csv">CSV-Export</button><label class="btn">Backup laden<input id="restore" type="file" accept=".json"></label></div>
 <div class="tabs"><button class="active" data-tab="competition">Wettkämpfe</button><button data-tab="training">Training</button></div><div id="dash"></div><div class="panel"><h2>Alle Einheiten</h2><div class="sub">Eintrag antippen für Details</div><button class="btn filter-toggle" id="toggleFilters" type="button" aria-expanded="false">Filter anzeigen</button><div class="filters" id="filtersPanel" hidden><div class="field filter-search"><label for="filterText">Suche</label><input id="filterText" type="search" placeholder="Datum, Ergebnis, Teiler …"></div><div class="field"><label for="filterFrom">Von</label><input id="filterFrom" type="date"></div><div class="field"><label for="filterTo">Bis</label><input id="filterTo" type="date"></div><div class="field"><label for="filterDiscipline">Disziplin</label><select id="filterDiscipline"><option value="">Alle Disziplinen</option><option>LG 60 ZR</option><option>LG 40 ZR</option></select></div><button class="btn" id="clearFilters">Filter zurücksetzen</button></div><div id="list"></div></div>
-<footer>Speicherung lokal im Browser. Für eine iCloud-Kopie „Backup“ wählen und die JSON-Datei in iCloud Drive speichern. Keine automatische iCloud-Synchronisierung. PDF-Textauswertung benötigt beim Import eine Internetverbindung.<div style="text-align:center;margin-top:14px;font-weight:700;letter-spacing:1px">Version 1.3.3</div></footer></main>
+<footer>Speicherung lokal im Browser. Für eine iCloud-Kopie „Backup“ wählen und die JSON-Datei in iCloud Drive speichern. Keine automatische iCloud-Synchronisierung. PDF-Textauswertung benötigt beim Import eine Internetverbindung.<div style="text-align:center;margin-top:14px;font-weight:700;letter-spacing:1px">Version 1.3.4</div></footer></main>
 <div class="modal" id="modal"><div class="sheet"><button class="btn" id="close">Schließen</button><div id="body"></div></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script>
 if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -77,7 +77,7 @@ document.querySelectorAll('.entry').forEach(e=>e.onclick=()=>detail(rows.find(x=
 function modal(html){document.getElementById('body').innerHTML=html;document.getElementById('modal').classList.add('show')}function detail(x){modal(`<h2>${date(x.date)}</h2>
 <p>Schütze: <b>${x.shooter||'—'}</b> · StartNr.: <b>${x.startNo||'—'}</b> · StandNr.: <b>${x.standNo||'—'}</b></p><p>Verein: <b>${x.club||'—'}</b></p><p>Disziplin: <b>${x.discipline||'LG 60 ZR'}</b></p><p>Ergebnis: <b>${fmt(x.score)}${x.scoreDetail?' ('+x.scoreDetail+')':''}</b></p>
 <h3>Serien – antippen für Einzelschüsse</h3><div class="series">${(x.series||[]).map((v,i)=>`<button class="btn seriesPick" data-series="${i}" style="text-align:left"><small>Serie ${i+1}</small><b>${fmt(v)}${x.seriesWhole?.[i]!=null?' ('+x.seriesWhole[i]+')':''}</b></button>`).join('')||'Nicht erkannt'}</div>
-<div class="sub">${(x.seriesDetails||[]).map(d=>`Serie ${d.series}: Trefferkreis ${d.group!=null?fmt(d.group)+' mm':'—'}; Trefferlage ${d.position||'—'}; beste Teiler ${d.dividers||'—'}`).join('<br>')}</div><div id="shotList" class="panel" style="display:none;margin-top:12px"></div>
+<div id="shotList" class="panel" style="display:none;margin-top:12px"></div>
 <h3>Zähler – Ringverteilung</h3><div class="series">${(x.counts||[]).map((v,i)=>`<div><small>${10-i}er</small><b>${v}</b></div>`).join('')||'Nicht erkannt'}</div>
 <p>Innenzehner: <b>${x.tens??'—'}</b></p>
 <p>Weiteste: <b>${(x.farthest||[]).join(' · ')||'Nicht erkannt'}</b></p>
@@ -137,6 +137,38 @@ async function ocrPage(page){
     }
     return{text,arrows};
   } finally {await worker.terminate();canvas.width=canvas.height=1;}
+}
+
+async function ocrImageCanvas(canvas){
+ if(!window.Tesseract)await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
+ const worker=await Tesseract.createWorker('deu+eng');
+ try{
+  await worker.setParameters({tessedit_pageseg_mode:'4',preserve_interword_spaces:'1',user_defined_dpi:'300'});
+  const result=await worker.recognize(canvas),data=result.data||{},words=data.words||[],arrows=[];
+  const shotWord=/^(?:10|[0-9])[.,][0-9](?:\\*|[*′'’])?$/;
+  for(const word of words){
+   if(!shotWord.test((word.text||'').trim())||!word.bbox)continue;
+   const b=word.bbox,x=Math.max(0,Math.min(canvas.width-1,Math.round(b.x1+1)));
+   const y=Math.max(0,Math.min(canvas.height-1,Math.round((b.y0+b.y1)/2-10)));
+   const w=Math.max(1,Math.min(38,canvas.width-x)),h=Math.max(1,Math.min(28,canvas.height-y));
+   if(w<5||h<5){arrows.push(null);continue}
+   const crop=document.createElement('canvas');crop.width=w;crop.height=h;
+   const cc=crop.getContext('2d',{willReadFrequently:true});cc.drawImage(canvas,x,y,w,h,0,0,w,h);
+   const im=cc.getImageData(0,0,w,h);let visible=0;
+   for(let k=0;k<im.data.length;k+=4){const lum=(im.data[k]+im.data[k+1]+im.data[k+2])/3;const alpha=lum<205?255:0;if(alpha)visible++;im.data[k]=im.data[k+1]=im.data[k+2]=0;im.data[k+3]=alpha}
+   if(visible<3){arrows.push(null);continue}
+   cc.putImageData(im,0,0);arrows.push(crop.toDataURL('image/png'));
+  }
+  return{text:data.text||'',arrows};
+ }finally{await worker.terminate()}
+}
+async function photoToPdf(canvas){
+ if(!window.jspdf?.jsPDF)await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+ const {jsPDF}=window.jspdf,doc=new jsPDF({orientation:canvas.width>canvas.height?'landscape':'portrait',unit:'mm',format:'a4'});
+ const pageW=doc.internal.pageSize.getWidth(),pageH=doc.internal.pageSize.getHeight(),ratio=Math.min(pageW/canvas.width,pageH/canvas.height);
+ const w=canvas.width*ratio,h=canvas.height*ratio;
+ doc.addImage(canvas.toDataURL('image/jpeg',0.94),'JPEG',(pageW-w)/2,(pageH-h)/2,w,h);
+ return doc.output('blob');
 }
 async function pdfText(file){
  if(!window.pdfjsLib)throw Error('PDF-Auswertung ist nicht geladen. Öffne die App mit Internetverbindung und lade die Seite neu.');
@@ -204,6 +236,28 @@ return{id:crypto.randomUUID(),kind:probe?'training':'competition',discipline,ser
 }
 async function sha256(file){let b=await file.arrayBuffer(),h=await crypto.subtle.digest('SHA-256',b);return [...new Uint8Array(h)].map(v=>v.toString(16).padStart(2,'0')).join('')}
 function duplicateOf(x){return rows.find(r=>(x.fileHash&&r.fileHash===x.fileHash)||(r.kind===x.kind&&(r.discipline||'LG 60 ZR')===(x.discipline||'LG 60 ZR')&&Math.abs(new Date(r.date)-new Date(x.date))<120000&&Math.abs(Number(r.score)-Number(x.score))<0.051&&JSON.stringify(r.series||[])===JSON.stringify(x.series||[])))}
+
+document.getElementById('photo').onchange=async e=>{
+ const f=e.target.files?.[0];if(!f)return;
+ try{
+  if(!f.type.startsWith('image/'))throw Error('Bitte ein Bild auswählen.');
+  const bitmap=await createImageBitmap(f),scale=Math.min(1,2600/Math.max(bitmap.width,bitmap.height));
+  const canvas=document.createElement('canvas');canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(bitmap.height*scale);
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();
+  const pdfBlob=await photoToPdf(canvas),scan=await ocrImageCanvas(canvas);
+  const pseudoFile={name:(f.name||'Foto').replace(/\.[^.]+$/,'')+'.pdf'};
+  const x=parse(scan.text,pseudoFile,scan.arrows);x.fileHash=await sha256(f);x.sourceType='Foto-OCR';x.scanPdf=true;
+  const dupe=duplicateOf(x),shotsOk=(x.shots||[]).length===x.series.length&&(x.shots||[]).every(a=>a.length===10),countsOk=(x.counts||[]).length===11;
+  modal(`<h2>Foto-Import kontrollieren</h2><p class="sub">${f.name} · Foto erkannt · PDF automatisch erstellt</p><div class="field"><label>Kategorie</label><select id="kind"><option value="competition" ${x.kind==='competition'?'selected':''}>Wettkampf</option><option value="training" ${x.kind==='training'?'selected':''}>Training</option></select></div><p>Schütze: <b>${x.shooter||'Nicht erkannt'}</b> · StartNr.: <b>${x.startNo||'—'}</b> · StandNr.: <b>${x.standNo||'—'}</b></p><p>Verein: <b>${x.club||'Nicht erkannt'}</b></p><p>Disziplin: <b>${x.discipline}</b> · Datum: <b>${date(x.date)}</b></p><p>Ergebnis: <b>${fmt(x.score)} (${x.scoreDetail||'Ganzringe nicht erkannt'})</b></p><p>Serien: ${(x.series||[]).map((v,i)=>fmt(v)+' ('+(x.seriesWhole?.[i]??'—')+')').join(' · ')||'Nicht erkannt'}</p><p>Innenzehner: ${x.tens}</p><p>Zähler 10er bis 0er: ${(x.counts||[]).join(' · ')||'Nicht erkannt'} ${countsOk?'':'⚠ unvollständig'}</p><p>Einzelschüsse je Serie: ${(x.shots||[]).map(a=>a.length).join(' / ')||'Nicht erkannt'} ${shotsOk?'':'⚠ nicht alle zehn erkannt'}</p><p>Weiteste: ${(x.farthest||[]).join(' · ')||'Nicht erkannt'}</p><p>Beste Teiler: ${(x.dividers||[]).join(' · ')||'Nicht erkannt'}</p><p>Trefferkreis: ${x.group!=null?fmt(x.group)+' mm':'Nicht erkannt'} · Trefferlage: ${x.position||'Nicht erkannt'}</p><p>Schusspfeile: ${(x.shotArrows||[]).flat().filter(Boolean).length} erkannt. Bei Fotos können kleine Pfeile unleserlich bleiben.</p>${dupe?'<p style="color:#ffbd70;font-weight:700">Mögliches Duplikat: Dieses Ergebnis ist bereits gespeichert.</p>':''}<p class="sub">Das Foto wurde in ein PDF umgewandelt. Bitte Werte kontrollieren, bevor du speicherst.</p><button class="btn" id="saveScanPdf">Erstelltes PDF speichern</button> <button class="btn primary" id="confirm">${dupe?'Trotzdem importieren':'Ergebnis speichern'}</button>`);
+  document.getElementById('saveScanPdf').onclick=()=>downloadBlob(pdfBlob,pseudoFile.name);
+  await new Promise(resolve=>document.getElementById('confirm').onclick=async()=>{
+   x.kind=document.getElementById('kind').value;
+   if(duplicateOf(x)&&!confirm('Dieses Ergebnis wurde möglicherweise bereits importiert. Trotzdem zusätzlich speichern?'))return;
+   await put(x);rows=await all();downloadBlob(pdfBlob,pseudoFile.name);document.getElementById('modal').classList.remove('show');render();resolve();
+  });
+ }catch(err){alert((f?.name||'Foto')+': '+err.message)}
+ e.target.value='';
+};
 document.getElementById('pdf').onchange=async e=>{for(let f of e.target.files){try{
  let hash=await sha256(f),extracted=await pdfText(f),x=parse(extracted.text,f,extracted.flatArrows);x.fileHash=hash;x.sourceType=extracted.usedOCR?'OCR':'PDF-Text';
  let dupe=duplicateOf(x),shotsOk=(x.shots||[]).length===x.series.length&&(x.shots||[]).every(a=>a.length===10),countsOk=(x.counts||[]).length===11;

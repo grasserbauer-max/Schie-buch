@@ -1,18 +1,15 @@
-# Mein Schießbuch – Version 1.3.3
+# Mein Schießbuch v1.3.4
 
-## Fehlerbehebung
-- OCR rendert gescannte PDF-Seiten mit höherer Auflösung (3×) und behält die Zeilenstruktur für die Serienauswertung bei.
-- Gesamtergebnis-Erkennung toleriert OCR-typische Abweichungen bei Doppelpunkt, Zeilenumbrüchen und einzelnen Zeichen.
-- OCR-Pfeilbereiche werden anhand der Position erkannter Schusswerte aus dem Scanbild ausgeschnitten; Zuordnung erfolgt nur bei passender Anzahl erkannter Schüsse.
-- Digitale PDF-Texterkennung und bisherige Detailansicht bleiben erhalten.
-- Duplikatprüfung bleibt aktiv (SHA-256 und Vergleich erkannter Ergebnisdaten).
-- IndexedDB bleibt unverändert `shootbook-v1`.
+## Änderungen
+- Neuer Foto-Import über iPhone-Kamera oder Fotomediathek.
+- Bild wird automatisch aufbereitet, per OCR ausgewertet und als A4-PDF erzeugt.
+- Das erzeugte PDF kann aus der Importvorschau gespeichert werden; nach dem Speichern wird es ebenfalls angeboten.
+- Die bestehende PDF-Importfunktion bleibt erhalten.
+- Redundante Serien-Zusammenfassungszeile (Trefferkreis/Trefferlage/beste Teiler) aus der Detailansicht entfernt.
+- Duplikatprüfung für Fotoimporte nutzt Datei-Hash und den Vergleich der Ergebnisdaten.
+- IndexedDB-Datenbank `shootbook-v1` bleibt unverändert.
 
-## Grenzen / Teststatus
-- JavaScript-Syntax und Archivstruktur werden geprüft. Ein vollständiger OCR-/Pfeiltest auf einem echten iPhone wurde nicht durchgeführt.
-- OCR kann bei schiefen, unscharfen oder kontrastarmen Scans einzelne Ziffern verwechseln. Vorschau deshalb vor dem Speichern kontrollieren.
-- Pfeile aus Scans werden als Bildausschnitte neben den erkannten Schusswerten gespeichert; ob jedes Symbol exakt getroffen wird, muss mit dem konkreten Gerät/Scan kontrolliert werden.
-- PDF.js und Tesseract.js werden beim Import über CDN geladen; Internetverbindung erforderlich.
-
-## Installation
-Alle Dateien aus dem ZIP auf GitHub Pages hochladen und die bisherigen Dateien ersetzen. Datenbank `shootbook-v1` nicht löschen oder umbenennen.
+## Hinweise
+- Für OCR und PDF-Erzeugung ist beim Import eine Internetverbindung erforderlich (Tesseract.js und jsPDF werden von CDNs geladen).
+- Die Erkennung von Einzelschüssen und Pfeilen hängt von Bildqualität, Schärfe, Perspektive und Beleuchtung ab. Unvollständige Werte werden in der Vorschau angezeigt und müssen vor dem Speichern kontrolliert werden.
+- Kein tatsächlicher iPhone-Feldtest wurde durchgeführt.
