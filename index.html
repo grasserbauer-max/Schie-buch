@@ -19,7 +19,7 @@
 </style></head><body><main><div class="headrow"><h1 id="appTitle">Mein Schießbuch ◎</h1><button class="btn settingsBtn" id="settings" aria-label="Einstellungen">⚙</button></div>
 <div class="actions"><label class="btn primary">＋ PDF importieren<input id="pdf" type="file" accept=".pdf,application/pdf" multiple></label><button class="btn" id="manual">＋ Manuell</button><button class="btn" id="backup">Backup</button><button class="btn" id="csv">CSV-Export</button><label class="btn">Backup laden<input id="restore" type="file" accept=".json"></label></div>
 <div class="tabs"><button class="active" data-tab="competition">Wettkämpfe</button><button data-tab="training">Training</button></div><div id="dash"></div><div class="panel"><h2>Alle Einheiten</h2><div class="sub">Eintrag antippen für Details</div><button class="btn filter-toggle" id="toggleFilters" type="button" aria-expanded="false">Filter anzeigen</button><div class="filters" id="filtersPanel" hidden><div class="field filter-search"><label for="filterText">Suche</label><input id="filterText" type="search" placeholder="Datum, Ergebnis, Teiler …"></div><div class="field"><label for="filterFrom">Von</label><input id="filterFrom" type="date"></div><div class="field"><label for="filterTo">Bis</label><input id="filterTo" type="date"></div><div class="field"><label for="filterDiscipline">Disziplin</label><select id="filterDiscipline"><option value="">Alle Disziplinen</option><option>LG 60 ZR</option><option>LG 40 ZR</option></select></div><button class="btn" id="clearFilters">Filter zurücksetzen</button></div><div id="list"></div></div>
-<footer>Speicherung lokal im Browser. Für eine iCloud-Kopie „Backup“ wählen und die JSON-Datei in iCloud Drive speichern. Keine automatische iCloud-Synchronisierung. PDF-Textauswertung benötigt beim Import eine Internetverbindung.<div style="text-align:center;margin-top:14px;font-weight:700;letter-spacing:1px">Version 1.3.2</div></footer></main>
+<footer>Speicherung lokal im Browser. Für eine iCloud-Kopie „Backup“ wählen und die JSON-Datei in iCloud Drive speichern. Keine automatische iCloud-Synchronisierung. PDF-Textauswertung benötigt beim Import eine Internetverbindung.<div style="text-align:center;margin-top:14px;font-weight:700;letter-spacing:1px">Version 1.3.3</div></footer></main>
 <div class="modal" id="modal"><div class="sheet"><button class="btn" id="close">Schließen</button><div id="body"></div></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script>
 if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -107,28 +107,36 @@ document.getElementById('manual').onclick=()=>{modal(`<h2>Ergebnis erfassen</h2>
 async function loadScript(src){return new Promise((resolve,reject)=>{let s=document.createElement('script');s.src=src;s.onload=resolve;s.onerror=()=>reject(Error('OCR-Bibliothek konnte nicht geladen werden. Bitte Internetverbindung prüfen.'));document.head.appendChild(s)})}
 async function ocrPage(page){
   if(!window.Tesseract)await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
+  // Higher render resolution improves recognition of small Meyton figures and symbols.
   let viewport=page.getViewport({scale:3.0}),canvas=document.createElement('canvas');
   canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
   let ctx=canvas.getContext('2d',{willReadFrequently:true});
   await page.render({canvasContext:ctx,viewport}).promise;
   const worker=await Tesseract.createWorker('deu+eng');
   try{
-    await worker.setParameters({tessedit_pageseg_mode:'11',preserve_interword_spaces:'1',user_defined_dpi:'300'});
-    let result=await worker.recognize(canvas),words=(result.data.words||[]).filter(w=>/^(?:10|[0-9])[.,][0-9]\*?$/.test((w.text||'').replace(/\s/g,'')));
-    // Meyton prints the direction symbol immediately to the right of each shot value.
-    // Crop the symbol from the rendered page instead of trying to infer it from OCR text.
-    words.sort((a,b)=>a.bbox.y0-b.bbox.y0||a.bbox.x0-b.bbox.x0);
+    await worker.setParameters({tessedit_pageseg_mode:'4',preserve_interword_spaces:'1',user_defined_dpi:'300'});
+    let result=await worker.recognize(canvas),data=result.data||{},words=data.words||[];
+    // Preserve line breaks: they are important for separating the six series blocks.
+    let text=data.text||'';
+    // Extract the small printed direction glyph immediately to the right of each OCR-recognized shot.
+    // Keep positional order; the parser only assigns these crops if the shot count matches exactly.
     let arrows=[];
-    for(let w of words){
-      let x=Math.min(canvas.width-1,Math.max(0,Math.round(w.bbox.x1+1))),y=Math.max(0,Math.round(w.bbox.y0-2));
-      let cw=Math.max(1,Math.min(30,canvas.width-x)),ch=Math.max(1,Math.min(28,canvas.height-y));
-      let im=ctx.getImageData(x,y,cw,ch),d=im.data,ink=0;
-      for(let i=0;i<d.length;i+=4){let v=(d[i]+d[i+1]+d[i+2])/3,alpha=v<170?255:0;if(alpha)ink++;d[i]=d[i+1]=d[i+2]=0;d[i+3]=alpha}
-      if(ink<3){arrows.push(null);continue}
-      let ac=document.createElement('canvas');ac.width=cw;ac.height=ch;ac.getContext('2d').putImageData(im,0,0);arrows.push(ac.toDataURL('image/png'));
+    const shotWord=/^(?:10|[0-9])[.,][0-9](?:\*|[*′'’])?$/;
+    for(const word of words){
+      if(!shotWord.test((word.text||'').trim())||!word.bbox)continue;
+      let b=word.bbox, x=Math.max(0,Math.min(canvas.width-1,Math.round(b.x1+1)));
+      let y=Math.max(0,Math.min(canvas.height-1,Math.round((b.y0+b.y1)/2-10)));
+      let w=Math.max(1,Math.min(34,canvas.width-x)),h=Math.max(1,Math.min(24,canvas.height-y));
+      if(w<5||h<5){arrows.push(null);continue;}
+      let crop=document.createElement('canvas');crop.width=w;crop.height=h;
+      let cc=crop.getContext('2d',{willReadFrequently:true});cc.drawImage(canvas,x,y,w,h,0,0,w,h);
+      let im=cc.getImageData(0,0,w,h),visible=0;
+      for(let k=0;k<im.data.length;k+=4){let lum=(im.data[k]+im.data[k+1]+im.data[k+2])/3;let alpha=lum<205?255:0;if(alpha)visible++;im.data[k]=im.data[k+1]=im.data[k+2]=0;im.data[k+3]=alpha;}
+      if(visible<3){arrows.push(null);continue;}
+      cc.putImageData(im,0,0);arrows.push(crop.toDataURL('image/png'));
     }
-    return{text:result.data.text||'',arrows};
-  }finally{await worker.terminate();canvas.width=canvas.height=1}
+    return{text,arrows};
+  } finally {await worker.terminate();canvas.width=canvas.height=1;}
 }
 async function pdfText(file){
  if(!window.pdfjsLib)throw Error('PDF-Auswertung ist nicht geladen. Öffne die App mit Internetverbindung und lade die Seite neu.');
@@ -137,22 +145,20 @@ async function pdfText(file){
   let page=await pdf.getPage(pageNo),content=await page.getTextContent();
   let pageText=content.items.map(z=>z.str).join(' ').trim();
   if(pageText.replace(/\s/g,'').length<35){
-    usedOCR=true;let ocr=await ocrPage(page);pageText=ocr.text;flatArrows.push(...ocr.arrows);
-  }else{
-   // Native Meyton PDFs: render once and crop the arrow glyph next to each shot value.
-   if(content.items.length){
+    usedOCR=true;let scanned=await ocrPage(page);pageText=scanned.text;flatArrows.push(...scanned.arrows);
+  } else {
+    // Preserve original PDF text and extract arrow glyphs from the vector/raster area beside shot values.
     let scale=3,viewport=page.getViewport({scale}),canvas=document.createElement('canvas');canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);let ctx=canvas.getContext('2d',{willReadFrequently:true});await page.render({canvasContext:ctx,viewport}).promise;
     let shotItems=content.items.filter(z=>/^(?:10|[0-9])[.,][0-9]\*?$/.test((z.str||'').trim())&&z.transform&&Number.isFinite(z.width));
-    shotItems.sort((a,b)=>{let ay=a.transform[5],by=b.transform[5];return Math.abs(ay-by)>2?by-ay:a.transform[4]-b.transform[4]});
-    for(let item of shotItems){let base=viewport.convertToViewportPoint(item.transform[4],item.transform[5]),end=viewport.convertToViewportPoint(item.transform[4]+item.width,item.transform[5]);let x=Math.round(end[0]+.5*scale),y=Math.round(base[1]-7*scale),w=Math.round(10*scale),h=Math.round(9*scale);x=Math.max(0,Math.min(canvas.width-w,x));y=Math.max(0,Math.min(canvas.height-h,y));let image=ctx.getImageData(x,y,w,h),px=image.data,visible=0;for(let k=0;k<px.length;k+=4){let b=(px[k]+px[k+1]+px[k+2])/3,a=b<175?255:0;if(a)visible++;px[k]=px[k+1]=px[k+2]=0;px[k+3]=a}if(visible<3){flatArrows.push(null);continue}let ac=document.createElement('canvas');ac.width=w;ac.height=h;ac.getContext('2d').putImageData(image,0,0);flatArrows.push(ac.toDataURL('image/png'))}
-    canvas.width=canvas.height=1;
-   }
+    for(let item of shotItems){let base=viewport.convertToViewportPoint(item.transform[4],item.transform[5]),end=viewport.convertToViewportPoint(item.transform[4]+item.width,item.transform[5]);let x=Math.round(end[0]+.3*scale),y=Math.round(base[1]-7.5*scale),w=Math.round(11*scale),h=Math.round(9*scale);x=Math.max(0,Math.min(canvas.width-w,x));y=Math.max(0,Math.min(canvas.height-h,y));let image;try{image=ctx.getImageData(x,y,w,h)}catch{flatArrows.push(null);continue}let px=image.data,visible=0;for(let k=0;k<px.length;k+=4){let b=(px[k]+px[k+1]+px[k+2])/3,a=Math.max(0,255-b);if(a<28)a=0;else if(a>75)visible++;px[k]=px[k+1]=px[k+2]=0;px[k+3]=a}if(visible<4){flatArrows.push(null);continue}let ac=document.createElement('canvas');ac.width=w;ac.height=h;ac.getContext('2d').putImageData(image,0,0);flatArrows.push(ac.toDataURL('image/png'))}
   }
   text+=pageText+'\n';
  }
  return{text,flatArrows,usedOCR}
 }
 function parse(t,f,flatArrows=[]){
+// Normalize common OCR substitutions while retaining line boundaries and decimal punctuation.
+t=String(t||'').replace(/[：]/g,':').replace(/[‐‑–—]/g,'-').replace(/\u00a0/g,' ').replace(/[|]/g,'1');
 let probe=/Vorbereitung\s*\/\s*Probe/i.test(t);
 let discipline=(t.match(/\bLG\s*(60|40)\s*ZR\b/i)||[])[0]||'LG 60 ZR';
 let isLG40=/LG\s*40\s*ZR/i.test(discipline);
@@ -160,8 +166,11 @@ if(isLG40&&!settings.enableLG40)throw Error('Dieses PDF ist ein LG-40-ZR-Wettkam
 const field=(name,next)=>{let re=new RegExp('(?:'+name+')\\s*:\\s*(.*?)(?=\\s+(?:'+next+')\\s*:|$)','i');return (t.match(re)||[])[1]?.trim()||''};
 const nums=v=>(v.match(/\d+(?:[.,]\d+)?(?:\s*\(\s*\d+\s*\.?\s*\))?/g)||[]);
 let result=field('Ergebnis','Serien|Zähler|Zahler|Innenzehner');
-let rm=result.match(/([\d]+[.,][\d]+)\s*(?:\(\s*(\d+)\s*\))?/);
-if(!rm)throw Error('Kein gültiges Gesamtergebnis erkannt. Bitte manuell erfassen.');
+let rm=result.match(/([\d]{2,3}[.,][\d])\s*(?:\(\s*(\d{2,3})\s*\))?/);
+// OCR often inserts a line break or misses the colon after 'Ergebnis'. Search the nearby text as fallback.
+if(!rm){let near=t.match(/Ergebn[i1l]s\s*:?[\s\r\n]*([\d]{2,3}[.,][\d])(?:\s*\(?\s*([\d]{2,3})\s*\)?)?/i);if(near)rm=near;}
+if(!rm){let scoreCandidate=t.match(/(?:^|\s)(6\d{2}[.,][0-9])\s*\(\s*(\d{3})\s*\)/);if(scoreCandidate)rm=scoreCandidate;}
+if(!rm)throw Error('Kein gültiges Gesamtergebnis erkannt. OCR-Text konnte nicht sicher zugeordnet werden. Bitte Scan prüfen.');
 let seriesRows=[...t.matchAll(/Serie\s*(\d+)\s*:\s*(\d+[.,]\d+)\s*\(\s*(\d+)\s*\)/gi)];
 let series=seriesRows.map(m=>Number(m[2].replace(',','.')));
 let seriesWhole=seriesRows.map(m=>Number(m[3]));
@@ -176,13 +185,14 @@ let shots=[];
 for(let n=1;n<=series.length;n++){
   let re=new RegExp('Serie\\s*'+n+'\\s*:\\s*[\\d]+[.,][\\d]+\\s*\\(\\s*\\d+\\s*\\)([\\s\\S]*?)(?=\\s+beste\\s+Teiler\\s*:|$)','i');
   let body=(t.match(re)||[])[1]||'';
-  shots.push((body.match(/(?:10|[0-9])[.,][0-9]\s*\*?/g)||[]).map(v=>v.replace(/\s/g,'').replace(',','.')).slice(0,10));
+  shots.push((body.match(/(?:10|[0-9])\.[0-9]\*?/g)||[]).slice(0,10));
 }
 let shotArrows=[],shotTotal=shots.reduce((sum,a)=>sum+a.length,0),arrowIndex=0;
-// Arrow crops are kept in page reading order (top-to-bottom, left-to-right).
-// Map only when counts match exactly; otherwise leave them unassigned rather than attach a wrong arrow.
-if(flatArrows.length===shotTotal){for(let row of shots)shotArrows.push(row.map(()=>flatArrows[arrowIndex++]||null));}
-else{shotArrows=shots.map(row=>row.map(()=>null));}
+if(flatArrows.length===shotTotal){
+  for(let row of shots)shotArrows.push(row.map(()=>flatArrows[arrowIndex++]||null));
+}else{
+  shotArrows=shots.map(row=>row.map(()=>null));
+}
 let d=(t.match(/(?:Wertung|Vorbereitung\/Probe)\s+(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})/i)||[])[1],dt=new Date();
 if(d){let [day,mon,year,time]=d.match(/(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}:\d{2})/).slice(1);dt=new Date(+year,+mon-1,+day,+time.slice(0,2),+time.slice(3))}
 let shooter=(t.match(/(?:^|\n)\s*([^\n#]+?)\s+#\s*\d+/)||[])[1]?.trim()||'';
@@ -197,7 +207,7 @@ function duplicateOf(x){return rows.find(r=>(x.fileHash&&r.fileHash===x.fileHash
 document.getElementById('pdf').onchange=async e=>{for(let f of e.target.files){try{
  let hash=await sha256(f),extracted=await pdfText(f),x=parse(extracted.text,f,extracted.flatArrows);x.fileHash=hash;x.sourceType=extracted.usedOCR?'OCR':'PDF-Text';
  let dupe=duplicateOf(x),shotsOk=(x.shots||[]).length===x.series.length&&(x.shots||[]).every(a=>a.length===10),countsOk=(x.counts||[]).length===11;
- modal(`<h2>PDF-Import kontrollieren</h2><p class="sub">${f.name} · ${extracted.usedOCR?'Gescannter Scan – OCR':'PDF-Texterkennung'}</p><div class="field"><label>Kategorie</label><select id="kind"><option value="competition" ${x.kind==='competition'?'selected':''}>Wettkampf</option><option value="training" ${x.kind==='training'?'selected':''}>Training</option></select></div><p>Schütze: <b>${x.shooter||'Nicht erkannt'}</b> · StartNr.: <b>${x.startNo||'—'}</b> · StandNr.: <b>${x.standNo||'—'}</b></p><p>Verein: <b>${x.club||'Nicht erkannt'}</b></p><p>Disziplin: <b>${x.discipline}</b> · Datum: <b>${date(x.date)}</b></p><p>Ergebnis: <b>${fmt(x.score)} (${x.scoreDetail||'Ganzringe nicht erkannt'})</b></p><p>Serien: ${(x.series||[]).map((v,i)=>fmt(v)+' ('+(x.seriesWhole?.[i]??'—')+')').join(' · ')||'Nicht erkannt'}</p><p>Innenzehner: ${x.tens}</p><p>Zähler 10er bis 0er: ${(x.counts||[]).join(' · ')||'Nicht erkannt'} ${countsOk?'':'⚠ unvollständig'}</p><p>Einzelschüsse je Serie: ${(x.shots||[]).map(a=>a.length).join(' / ')||'Nicht erkannt'} ${shotsOk?'':'⚠ nicht alle zehn erkannt'}</p><p>Weiteste: ${(x.farthest||[]).join(' · ')||'Nicht erkannt'}</p><p>Beste Teiler: ${(x.dividers||[]).join(' · ')||'Nicht erkannt'}</p><p>Trefferkreis: ${x.group!=null?fmt(x.group)+' mm':'Nicht erkannt'} · Trefferlage: ${x.position||'Nicht erkannt'}</p><p>Trefferbilder: ${(x.shotArrows||[]).flat().filter(Boolean).length+' Pfeile aus Dokumentbild erkannt'}</p>${dupe?'<p style="color:#ffbd70;font-weight:700">Mögliches Duplikat: Dieses Dokument bzw. Ergebnis ist bereits gespeichert.</p>':''}<p class="sub">Bitte erkannte Werte vor dem Speichern kontrollieren. OCR kann einzelne Ziffern oder Schüsse verwechseln.</p><button class="btn primary" id="confirm">${dupe?'Trotzdem importieren':'Speichern'}</button>`);
+ modal(`<h2>PDF-Import kontrollieren</h2><p class="sub">${f.name} · ${extracted.usedOCR?'Gescannter Scan – OCR':'PDF-Texterkennung'}</p><div class="field"><label>Kategorie</label><select id="kind"><option value="competition" ${x.kind==='competition'?'selected':''}>Wettkampf</option><option value="training" ${x.kind==='training'?'selected':''}>Training</option></select></div><p>Schütze: <b>${x.shooter||'Nicht erkannt'}</b> · StartNr.: <b>${x.startNo||'—'}</b> · StandNr.: <b>${x.standNo||'—'}</b></p><p>Verein: <b>${x.club||'Nicht erkannt'}</b></p><p>Disziplin: <b>${x.discipline}</b> · Datum: <b>${date(x.date)}</b></p><p>Ergebnis: <b>${fmt(x.score)} (${x.scoreDetail||'Ganzringe nicht erkannt'})</b></p><p>Serien: ${(x.series||[]).map((v,i)=>fmt(v)+' ('+(x.seriesWhole?.[i]??'—')+')').join(' · ')||'Nicht erkannt'}</p><p>Innenzehner: ${x.tens}</p><p>Zähler 10er bis 0er: ${(x.counts||[]).join(' · ')||'Nicht erkannt'} ${countsOk?'':'⚠ unvollständig'}</p><p>Einzelschüsse je Serie: ${(x.shots||[]).map(a=>a.length).join(' / ')||'Nicht erkannt'} ${shotsOk?'':'⚠ nicht alle zehn erkannt'}</p><p>Weiteste: ${(x.farthest||[]).join(' · ')||'Nicht erkannt'}</p><p>Beste Teiler: ${(x.dividers||[]).join(' · ')||'Nicht erkannt'}</p><p>Trefferkreis: ${x.group!=null?fmt(x.group)+' mm':'Nicht erkannt'} · Trefferlage: ${x.position||'Nicht erkannt'}</p><p>Trefferbilder: ${extracted.usedOCR?'Scanbild vorhanden; Schussrichtungen werden nicht automatisch aus OCR abgeleitet.':(x.shotArrows||[]).flat().filter(Boolean).length+' Pfeile aus PDF erkannt'}</p>${dupe?'<p style="color:#ffbd70;font-weight:700">Mögliches Duplikat: Dieses Dokument bzw. Ergebnis ist bereits gespeichert.</p>':''}<p class="sub">Bitte erkannte Werte vor dem Speichern kontrollieren. OCR kann einzelne Ziffern oder Schüsse verwechseln.</p><button class="btn primary" id="confirm">${dupe?'Trotzdem importieren':'Speichern'}</button>`);
  await new Promise(resolve=>document.getElementById('confirm').onclick=async()=>{x.kind=document.getElementById('kind').value;let existing=duplicateOf(x);if(existing){if(!confirm('Dieses Dokument oder ein inhaltlich gleiches Ergebnis wurde bereits importiert. Möchtest du es trotzdem als zusätzlichen Eintrag speichern?')){document.getElementById('modal').classList.remove('show');resolve();return}}
  await put(x);rows=await all();document.getElementById('modal').classList.remove('show');render();resolve()})
  }catch(err){alert(f.name+': '+err.message)}}e.target.value=''};
