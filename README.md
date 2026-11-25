@@ -1,4 +1,4 @@
-# Mein Schießbuch v1.3.16
+# Mein Schießbuch v1.3.17
 
 ## Änderungen
 - Bildbasierte PDFs ohne Textschicht werden nicht mehr nur als eine einzige Vollseite-OCR verarbeitet.
@@ -10,7 +10,7 @@
 - Zähler werden nur übernommen, wenn eine eindeutige mathematische Zuordnung möglich ist.
 - Fotoimport bleibt entfernt; PDF ist die einzige Importmöglichkeit.
 - Originale PDF-Pfeilextraktion, Duplikatprüfung und IndexedDB `shootbook-v1` bleiben erhalten.
-- Versionsanzeige und Service-Worker-Cache auf 1.3.16 aktualisiert.
+- Versionsanzeige und Service-Worker-Cache auf 1.3.17 aktualisiert.
 
 ## Einschränkungen und Teststatus
 - OCR-Regionen sind auf das bekannte Meyton-Einseitenlayout ausgelegt.
@@ -18,8 +18,13 @@
 - JavaScript-Syntax und Paketstruktur werden geprüft. Die tatsächliche OCR-Qualität muss mit dem Originalscan und auf Safari/iPhone praktisch getestet werden.
 
 
-## Version 1.3.16
+## Version 1.3.17
 - iPhone-PDFs without a complete text layer now trigger OCR even if they contain stray extracted characters.
 - OCR results are correctly passed to the import parser, including the six separately recognized series regions.
 - Removed duplicated shot-consistency lines in the import preview.
 - Existing native Meyton PDF text import remains the preferred path when the text layer is complete.
+
+
+## Version 1.3.17
+- Serienwerte werden aus den sechs einzelnen Serienbereichen gelesen, auch wenn OCR die Anfangsbuchstaben der Überschrift abschneidet.
+- Die separat erkannten Serienüberschriften haben Vorrang vor der kompakten Kopfzeile.
