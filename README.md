@@ -1,15 +1,18 @@
-# Mein Schießbuch v1.3.14
+# Mein Schießbuch v1.3.15
 
 ## Änderungen
-- Fotoimport vollständig entfernt: kein Foto-Button, kein Foto-Importhandler und keine Foto-zu-PDF-Konvertierung mehr.
-- PDF importieren ist die einzige Importmöglichkeit und bleibt links als primärer Importbutton.
-- PDF-Import erkennt weiterhin PDFs mit Textebene und gescannte Bild-PDFs ohne Textebene.
-- OCR für Bild-PDFs überarbeitet: adaptive Renderauflösung mit begrenzter maximaler Bildkante, um Speicherprobleme auf dem iPhone zu reduzieren.
-- OCR-Bildvorverarbeitung verbessert den Kontrast von grauem Papier, ohne kleine Dezimalpunkte durch harte Binarisierung zu entfernen.
-- Zweiter OCR-Durchlauf mit alternativer Seitensegmentierung, wenn die erste Erkennung zu wenig Text liefert.
-- Bestehender PDF-Parser, Duplikatprüfung und Pfeilextraktion bleiben erhalten.
-- IndexedDB `shootbook-v1` bleibt unverändert.
-- Versionsanzeige und Service-Worker-Cache auf 1.3.14 aktualisiert.
+- Bildbasierte PDFs ohne Textschicht werden nicht mehr nur als eine einzige Vollseite-OCR verarbeitet.
+- Die gescannte Seite wird für Meyton-Protokolle in Kopf-/Ergebnisbereich und sechs separate Serienbereiche aufgeteilt.
+- Jede Serie wird einzeln mit positionsbasierter Erkennung der zwei Schusszeilen ausgewertet.
+- Serienübersicht und Gesamtergebnis bleiben die gedruckten Referenzwerte; erkannte Einzelschüsse überschreiben diese Werte nicht.
+- Je Serie wird die Summe der zehn erkannten Schüsse gegen den gedruckten Serienwert geprüft.
+- Die Gesamtsumme der Einzelschüsse wird separat gegen das Gesamtergebnis geprüft.
+- Zähler werden nur übernommen, wenn eine eindeutige mathematische Zuordnung möglich ist.
+- Fotoimport bleibt entfernt; PDF ist die einzige Importmöglichkeit.
+- Originale PDF-Pfeilextraktion, Duplikatprüfung und IndexedDB `shootbook-v1` bleiben erhalten.
+- Versionsanzeige und Service-Worker-Cache auf 1.3.15 aktualisiert.
 
-## Hinweis zum iPhone-Scan
-Das bereitgestellte iPhone-PDF ist ein Bild-PDF ohne Textschicht. Es wird daher über PDF.js gerendert und lokal mit Tesseract.js OCR verarbeitet. Die neue OCR-Verarbeitung wurde syntaktisch geprüft, aber noch nicht auf einem echten iPhone ausgeführt. Die Erkennungsqualität muss nach dem Upload mit dem bereitgestellten Scan kontrolliert werden.
+## Einschränkungen und Teststatus
+- OCR-Regionen sind auf das bekannte Meyton-Einseitenlayout ausgelegt.
+- Mehrseitige PDFs werden seitenweise OCR-verarbeitet; die zusätzliche Serien-Übernahme nutzt die erste erkannte Scan-Seite.
+- JavaScript-Syntax und Paketstruktur werden geprüft. Die tatsächliche OCR-Qualität muss mit dem Originalscan und auf Safari/iPhone praktisch getestet werden.
